@@ -44,6 +44,8 @@
 - B4 答案边界校验 6 个专项测试，并增加执行器损坏答案拒绝测试；全仓当前 7 个测试文件、41 个测试通过。覆盖跨 run/mode、重复或缺失引用、正文不存在的 quote、scope、未规划来源和被篡改的公开来源元数据。
 - 已安装并锁定官方 OpenAI Node SDK 6.49.0；选择 6.x 是为了保留项目 Node ≥20 的团队兼容范围（7.15.0 要求 Node ≥22）。安装审计为 0 个已知漏洞。OpenAI 规划器 6 个专项测试通过；全仓当前 8 个测试文件、47 个测试通过。
 - `gpt-5-mini` 真实最小规划 smoke 通过：Responses API 返回 plan，并且服务端最终只接受 synthetic allowlist source；请求未使用真实 UTSG 事实。可复现命令：`npm run smoke:planner --workspace @allabout/server`。
+- 已合入 `origin/main` 的 A 前端提交。按 A 的 pnpm 锁文件独立安装后，6 个 `node:test` 测试和 production build 均通过；A 当前 README 写有 `pnpm test`，但 package 尚无 test script，实际验证命令为 `node --test tests/history.test.mjs`。
+- 根 npm workspace 明确限定为 `apps/server` 与 `packages/*`，避免 npm 改写 A 的独立 pnpm 前端；根 Vitest 配置排除 `apps/web` 的 Node test，防止两种测试运行器互相误收集。是否最终统一包管理器仍需团队决定。
 
 ## 当前边界
 
@@ -52,4 +54,4 @@
 - 真实密钥已安全复制到此 checkout 的 `.env`，该文件被 Git 忽略；未输出或暂存密钥。
 - 当前 Codex 运行环境能运行 Node，但没有全局 `npm` 命令；通过临时 npm 12.0.2 完成依赖安装。团队普通 Node/npm 环境可直接使用锁文件；本地后续检查可直接调用已安装工具。
 - 正常团队命令：`npm install`、`npm run dev:server`、`npm run typecheck`、`npm test`。当前 Codex 终端的验证使用锁文件中相同工具直接执行，并额外完成真实服务烟测。
-- 下一步：明确更细的清理生命周期，并检查 C/D 远端分支是否已有可接入的公共实现。具体演示课程/活动尚未选定，推进到依赖该选择的步骤时及时问用户。
+- 下一步：检查 D 的 `feat/evidence` 公共入口与共享契约差异，先形成适配或变更提案；同时明确更细的清理生命周期。C 分支尚未出现。具体演示课程/活动尚未选定，推进到依赖该选择的步骤时及时问用户。
