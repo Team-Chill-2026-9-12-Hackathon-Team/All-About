@@ -36,6 +36,59 @@ function normalizeText(value: string): string {
   return value.replace(/\s+/g, " ").trim().toLocaleLowerCase("en-CA");
 }
 
+const SUPPORT_STOP_WORDS = new Set([
+  "a", "an", "and", "are", "at", "be", "by", "for", "from", "in", "is", "it",
+  "of", "on", "or", "the", "this", "to", "was", "will", "with",
+]);
+
+function supportTokens(value: string): Set<string> {
+  return new Set(
+    normalizeText(value)
+      .split(/[^a-z0-9]+/)
+      .filter((token) => token.length > 1 && !SUPPORT_STOP_WORDS.has(token)),
+  );
+}
+
+function claimHasSemanticSupport(claim: AnswerBundle["claims"][number], quotes: string[]): boolean {
+  const claimTokens = supportTokens(claim.text);
+  if (claimTokens.size === 0) return false;
+  const evidenceTokens = supportTokens(quotes.join(" "));
+  const supported = [...claimTokens].filter((token) => evidenceTokens.has(token)).length;
+  return supported / claimTokens.size >= 0.6;
+}
+
+function validateExecutionTruth(plan: QueryPlan, batch: BrowserBatch, issues: string[]): void {
+  const expectedContentMode =
+    plan.input.mode === "LIVE_WEB"
+      ? "live"
+      : plan.input.mode === "REPLAY"
+        ? "cached"
+        : "fixture";
+
+  for (const target of plan.targets) {
+    if (target.contentMode !== expectedContentMode) {
+      issues.push(
+        `${plan.input.mode} target ${target.id} must use ${expectedContentMode} content, received ${target.contentMode}`,
+      );
+    }
+  }
+  for (const page of batch.pages) {
+    if (page.contentMode !== expectedContentMode) {
+      issues.push(
+        `${plan.input.mode} snapshot ${page.id} must use ${expectedContentMode} content, received ${page.contentMode}`,
+      );
+    }
+  }
+
+  const localExecution = plan.input.mode === "LOCAL_FIXTURE" || plan.input.mode === "REPLAY";
+  if (localExecution && batch.cleanup !== "not_created") {
+    issues.push(`${plan.input.mode} must not claim that a browser session was created`);
+  }
+  if (!localExecution && batch.cleanup === "not_created") {
+    issues.push(`${plan.input.mode} requires an attempted browser session and cleanup receipt`);
+  }
+}
+
 function validateBlocks(
   label: string,
   blocks: AnswerBlock[],
@@ -65,6 +118,7 @@ export function validateAnswerBundle(
   if (answer.runId !== plan.runId) issues.push("runId does not match the active run");
   if (answer.mode !== plan.input.mode) issues.push("mode does not match the query input");
   if (!sameScope(answer.scope, plan.input.scope)) issues.push("bundle scope does not match the query input");
+  validateExecutionTruth(plan, batch, issues);
 
   const collections = {
     claim: answer.claims.map(({ id }) => id),
@@ -81,6 +135,15 @@ export function validateAnswerBundle(
   const evidenceIds = new Set(collections.evidence);
   const snapshotById = new Map(batch.pages.map((page) => [page.id, page]));
   const targetIds = new Set(plan.targets.map(({ id }) => id));
+  const coverageSourceIds = answer.coverage.map(({ sourceId }) => sourceId);
+  for (const sourceId of duplicateIds(coverageSourceIds)) {
+    issues.push(`duplicate coverage entry for ${sourceId}`);
+  }
+  for (const targetId of targetIds) {
+    if (!coverageSourceIds.includes(targetId)) {
+      issues.push(`coverage is missing planned source ${targetId}`);
+    }
+  }
   for (const page of batch.pages) {
     if (!targetIds.has(page.sourceId)) {
       issues.push(`browser batch contains unplanned source ${page.sourceId}`);
@@ -98,6 +161,17 @@ export function validateAnswerBundle(
       if (!evidenceIds.has(evidenceId)) {
         issues.push(`claim ${claim.id} references unknown evidence ${evidenceId}`);
       }
+    }
+    if (
+      claim.status === "supported" &&
+      !claimHasSemanticSupport(
+        claim,
+        claim.evidenceIds
+          .map((id) => answer.evidence.find((item) => item.id === id)?.quote)
+          .filter((quote): quote is string => quote !== undefined),
+      )
+    ) {
+      issues.push(`supported claim ${claim.id} is not grounded in its cited quote`);
     }
   }
 
@@ -149,6 +223,15 @@ export function validateAnswerBundle(
       } else if (snapshot.sourceId !== coverage.sourceId) {
         issues.push(`coverage for ${coverage.sourceId} references another source's snapshot ${snapshotId}`);
       }
+    }
+    if (coverage.status === "checked" && coverage.snapshotIds.length === 0) {
+      issues.push(`checked coverage for ${coverage.sourceId} has no snapshot receipt`);
+    }
+    if (
+      (coverage.status === "blocked" || coverage.status === "not_checked") &&
+      coverage.snapshotIds.length > 0
+    ) {
+      issues.push(`${coverage.status} coverage for ${coverage.sourceId} cannot cite snapshots`);
     }
   }
 

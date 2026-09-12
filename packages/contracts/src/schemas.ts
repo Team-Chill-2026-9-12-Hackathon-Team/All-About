@@ -10,7 +10,24 @@ export const SourceKindSchema = z.enum([
   "course_discussion",
   "community",
 ]);
-export const RunModeSchema = z.enum(["LIVE_WEB", "LIVE_FIXTURE", "REPLAY"]);
+export const RunModeSchema = z.enum([
+  "LIVE_WEB",
+  "LIVE_FIXTURE",
+  "LOCAL_FIXTURE",
+  "REPLAY",
+]);
+export const ExecutionKindSchema = z.enum([
+  "steel_live_web",
+  "steel_live_fixture",
+  "local_fixture",
+  "replay",
+]);
+export const ViewerStateSchema = z.enum([
+  "unavailable",
+  "ready",
+  "closed",
+  "cleanup_failed",
+]);
 export const ContentModeSchema = z.enum([
   "live",
   "cached",
@@ -246,11 +263,18 @@ export const CreateRunResponseSchema = z.strictObject({
 
 export const RunSnapshotSchema = z.strictObject({
   runId: identifierSchema,
+  mode: RunModeSchema,
+  executionKind: ExecutionKindSchema,
   status: RunStatusSchema,
   answer: AnswerBundleSchema.nullable(),
   lastSeq: z.number().int().nonnegative(),
   cleanup: CleanupStateSchema.nullable(),
   viewerUrl: z.string().url().nullable(),
+  viewerState: ViewerStateSchema,
+  clarification: z.strictObject({
+    question: z.string().trim().min(1),
+    missingFields: z.array(identifierSchema).min(1),
+  }).nullable(),
 });
 
 export const ClarificationRequestSchema = z.strictObject({
@@ -282,6 +306,15 @@ export const EventEnvelopeSchema = z.discriminatedUnion("type", [
     ...eventBaseShape,
     type: z.literal("run_status"),
     payload: z.strictObject({ status: RunStatusSchema }),
+  }),
+  z.strictObject({
+    ...eventBaseShape,
+    type: z.literal("execution_changed"),
+    payload: z.strictObject({
+      mode: RunModeSchema,
+      executionKind: ExecutionKindSchema,
+      reason: z.literal("live_fixture_unavailable"),
+    }),
   }),
   z.strictObject({
     ...eventBaseShape,

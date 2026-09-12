@@ -1,6 +1,7 @@
 import {
   QueryPlanSchema,
   BrowserBatchSchema,
+  type BrowserBatch,
   type BrowserSignal,
   type BuildAnswer,
   type CollectPages,
@@ -50,6 +51,8 @@ export class RunExecutor {
   readonly #timeoutMs: number;
   readonly #clarificationTimeoutMs: number;
   readonly #controllers = new Map<string, AbortController>();
+  readonly #tasks = new Map<string, Promise<void>>();
+  readonly #collections = new Map<string, Promise<BrowserBatch>>();
   readonly #clarificationTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(dependencies: RunExecutorDependencies) {
@@ -70,15 +73,20 @@ export class RunExecutor {
     this.#clearClarificationTimer(runId);
     const controller = new AbortController();
     this.#controllers.set(runId, controller);
-    void this.#execute(runId, controller).finally(() => {
+    const task = this.#execute(runId, controller).finally(() => {
       this.#controllers.delete(runId);
+      this.#tasks.delete(runId);
     });
+    this.#tasks.set(runId, task);
   }
 
-  cancel(runId: string) {
+  async cancel(runId: string) {
     this.#clearClarificationTimer(runId);
     this.#controllers.get(runId)?.abort();
-    return this.#runStore.cancel(runId);
+    this.#runStore.cancel(runId);
+    await this.#collections.get(runId)?.catch(() => undefined);
+    await this.#tasks.get(runId);
+    return this.#runStore.getSnapshot(runId);
   }
 
   async #execute(runId: string, controller: AbortController): Promise<void> {
@@ -134,14 +142,16 @@ export class RunExecutor {
           (signal) => this.#mapBrowserSignal(runId, signal),
           controller.signal,
         ).then((candidate) => BrowserBatchSchema.parse(candidate));
+      this.#collections.set(runId, collection);
+      void collection.then(
+        () => this.#collections.delete(runId),
+        () => this.#collections.delete(runId),
+      );
       void collection.then(
         (batch) => this.#runStore.setCleanup(runId, batch.cleanup),
         () => undefined,
       );
-      const batch = await this.#withAbort(
-        collection,
-        controller.signal,
-      );
+      const batch = await this.#withAbort(collection, controller.signal);
       if (!this.#isWritable(runId)) return;
 
       this.#runStore.appendEvent(runId, "viewer_closed", {
@@ -263,7 +273,12 @@ export function createDefaultPlan(
   const orderedIds = input.sourceIds ?? sources.map((source) => source.id);
   const targets = orderedIds
     .map((id) => sources.find((source) => source.id === id))
-    .filter((source): source is SourceConfig => source !== undefined && source.access !== "unconfigured")
+    .filter(
+      (source): source is SourceConfig =>
+        source !== undefined &&
+        source.access !== "unconfigured" &&
+        sourceMatchesExecutionMode(source, input.mode),
+    )
     .slice(0, 3);
 
   return QueryPlanSchema.parse({
@@ -285,7 +300,9 @@ export function browserPlanBudget(targets: SourceConfig[]): QueryPlan["budget"] 
 }
 
 function defaultRequestedFields(input: QueryInput): QueryPlan["requestedFields"] {
-  if (input.mode === "LIVE_FIXTURE") return ["deadline", "submission_format", "late_penalty"];
+  if (input.mode === "LIVE_FIXTURE" || input.mode === "LOCAL_FIXTURE") {
+    return ["deadline", "submission_format", "late_penalty"];
+  }
   const ids = input.sourceIds ?? [];
   const query = input.query;
   if (
@@ -306,4 +323,12 @@ function defaultRequestedFields(input: QueryInput): QueryPlan["requestedFields"]
     return ["deadline", "submission_format"];
   }
   return ["requirements", "eligibility"];
+}
+
+function sourceMatchesExecutionMode(source: SourceConfig, mode: QueryInput["mode"]): boolean {
+  if (mode === "LIVE_FIXTURE" || mode === "LOCAL_FIXTURE") {
+    return source.contentMode === "fixture";
+  }
+  if (mode === "REPLAY") return source.contentMode === "cached";
+  return source.contentMode === "live" || source.contentMode === "user_provided";
 }

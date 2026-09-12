@@ -24,7 +24,9 @@ export function parseDateValue(rawInput: string): DateValue {
   }
 
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    return { precision: "date", date: raw, timezone: null };
+    return isCalendarDate(raw)
+      ? { precision: "date", date: raw, timezone: null }
+      : { precision: "unknown", raw };
   }
 
   const natural = raw.match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})(?:\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?\s*([A-Z]{2,5}|[A-Za-z_]+\/[A-Za-z_]+)?)?$/i);
@@ -33,6 +35,7 @@ export function parseDateValue(rawInput: string): DateValue {
   const month = MONTHS[monthName!.toLowerCase()];
   if (!month) return { precision: "unknown", raw };
   const date = `${year}-${month}-${day!.padStart(2, "0")}`;
+  if (!isCalendarDate(date)) return { precision: "unknown", raw };
   if (!hourRaw) return { precision: "date", date, timezone: timezone ?? null };
   if (!timezone) return { precision: "unknown", raw };
   const offset = OFFSETS[timezone.toUpperCase()];
@@ -47,4 +50,13 @@ export function parseDateValue(rawInput: string): DateValue {
     iso: `${date}T${String(hour).padStart(2, "0")}:${minute}:00${offset}`,
     timezone,
   };
+}
+
+function isCalendarDate(value: string): boolean {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return false;
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  return candidate.getUTCFullYear() === year
+    && candidate.getUTCMonth() === month - 1
+    && candidate.getUTCDate() === day;
 }

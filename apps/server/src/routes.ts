@@ -30,7 +30,7 @@ interface RunRoutesDependencies {
   executionAvailable: boolean;
   onRunCreated?: (runId: string) => void;
   onRunClarified?: (runId: string) => void;
-  cancelRun?: (runId: string) => RunSnapshot;
+  cancelRun?: (runId: string) => RunSnapshot | Promise<RunSnapshot>;
 }
 
 function sendError(
@@ -259,7 +259,7 @@ export function registerRunRoutes(
         return sendError(reply, 400, "INVALID_RUN_ID", "A run ID is required.");
       }
       try {
-        const run = dependencies.cancelRun?.(runId) ?? runStore.cancel(runId);
+        const run = await (dependencies.cancelRun?.(runId) ?? runStore.cancel(runId));
         return reply.code(202).send(
           CancelRunResponseSchema.parse({ runId: run.runId, status: run.status }),
         );

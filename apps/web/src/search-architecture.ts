@@ -21,7 +21,7 @@ const COURSE_RE = /\b([a-z]{3})\s?-?\s?(\d{3})(h1|y1)?\b/i;
 
 export function classifyQuestion(question: string): QueryKind {
   if (/(?:exam|finals?|deferred|conflict)/i.test(question)) return 'exam';
-  if (/(?:assignment|homework|problem set|\ba2\b|due date|deadline)/i.test(question)) return 'assignment';
+  if (/(?:assignment|homework|problem set|\ba\d+\b|due date|deadline|submission format|late penalty)/i.test(question)) return 'assignment';
   if (/(?:event|recital|carillon|hart house|workshop|orientation|club)/i.test(question)) return 'event';
   if (COURSE_RE.test(question)) return 'course';
   return 'general';
@@ -34,6 +34,7 @@ export function detectSearch(question: string): SearchBlueprint {
   const isCsc207 = /\bcsc\s?-?\s?207\b/i.test(question);
   const isCsc148 = /\bcsc\s?-?\s?148\b/i.test(question);
   const isCarillon = /carillon|labour day|soldiers.? tower/i.test(question);
+  const assignmentMatch = question.match(/(?:assignment|\ba)\s*-?\s*(\d+)/i);
   const course = isDemo101
     ? 'DEMO101'
     : isCsc207
@@ -45,26 +46,26 @@ export function detectSearch(question: string): SearchBlueprint {
         : null;
 
   const sourceIds: string[] = [];
-  if (kind === 'exam') {
+  if (isDemo101) {
+    sourceIds.push('demo101-syllabus', 'demo101-announcement', 'demo101-student-discussion');
+  } else if (kind === 'exam') {
     sourceIds.push('academic-calendar-sessional-dates', 'artsci-exam-conflicts', 'artsci-academic-dates');
     if (isCsc207 || course === 'CSC207H1') {
       sourceIds.splice(2, 1, 'academic-calendar-csc207');
     }
   } else if (kind === 'event') {
     if (isCarillon) {
-      sourceIds.push('alumni-carillon-recital', 'uoft-events', 'student-life-events');
+      sourceIds.push('alumni-carillon-recital', 'soldiers-tower-features');
     } else {
       sourceIds.push('uoft-events', 'student-life-events', 'hart-house-events');
     }
   } else if (kind === 'assignment') {
-    if (isDemo101 || course === 'DEMO101') {
-      sourceIds.push('demo101-syllabus', 'demo101-announcement', 'demo101-student-discussion');
-    } else if (isCsc207 || course === 'CSC207H1') {
+    if (isCsc207 || course === 'CSC207H1') {
       sourceIds.push('academic-calendar-csc207', 'piazza-login', 'quercus-login');
     } else if (isCsc148 || course === 'CSC148H1') {
       sourceIds.push('academic-calendar-csc148', 'piazza-login', 'quercus-login');
     } else {
-      sourceIds.push('academic-calendar-csc207', 'piazza-login', 'quercus-login');
+      sourceIds.push('piazza-login', 'quercus-login');
     }
   } else if (kind === 'course') {
     if (isCsc207 || course === 'CSC207H1') {
@@ -72,7 +73,7 @@ export function detectSearch(question: string): SearchBlueprint {
     } else if (isCsc148 || course === 'CSC148H1') {
       sourceIds.push('academic-calendar-csc148', 'cs-undergrad-courses', 'timetable-builder');
     } else {
-      sourceIds.push('academic-calendar-csc207', 'cs-undergrad-courses', 'timetable-builder');
+      sourceIds.push('timetable-builder');
     }
   } else {
     sourceIds.push('academic-calendar-csc207', 'student-life-events', 'uoft-events');
@@ -89,8 +90,10 @@ export function detectSearch(question: string): SearchBlueprint {
       ? (isCarillon ? 'Labour Day Carillon Recital' : null)
       : kind === 'exam'
         ? 'final-exams'
-        : isDemo101 || course === 'DEMO101'
-          ? 'Assignment 2'
+        : assignmentMatch
+          ? `Assignment ${assignmentMatch[1]}`
+          : isDemo101 || course === 'DEMO101'
+            ? 'Assignment 2'
         : null,
   };
 }

@@ -1,7 +1,7 @@
 import type { Authority, PageSnapshot, QueryPlan } from "@allabout/contracts";
 import type { CandidateExtractor, ExtractedCandidate } from "./types.js";
 
-const DATE = /(?:\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2}))?|[A-Za-z]+\s+\d{1,2}(?:,\s*\d{4})?(?:\s+(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:AM|PM)?\s*(?:[A-Z]{2,5}|[A-Za-z_]+\/[A-Za-z_]+)?)?)/i;
+const DATE = /(?:\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2}))?|(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:,\s*\d{4})?(?:\s+(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:AM|PM)?\s*(?:[A-Z]{2,5}|[A-Za-z_]+\/[A-Za-z_]+)?)?)/i;
 const TIME = /\b\d{1,2}(?::\d{2})\s*(?:AM|PM)?(?:\s*(?:EST|EDT|UTC|GMT|[A-Za-z_]+\/[A-Za-z_]+))?\b/i;
 const URL = /https?:\/\/[^\s<>"']+/i;
 
@@ -25,6 +25,13 @@ function segments(text: string): string[] {
 
 function requested(plan: QueryPlan, ...fields: string[]): boolean {
   return fields.some((field) => plan.requestedFields.includes(field));
+}
+
+function matchesRequestedAssignment(plan: QueryPlan, sentence: string): boolean {
+  const requestedNumber = plan.input.scope.entity?.match(/(?:assignment|a)\s*(\d+)/i)?.[1];
+  if (!requestedNumber) return true;
+  const mentioned = [...sentence.matchAll(/(?:assignment|a)\s*(\d+)/gi)].map((match) => match[1]);
+  return mentioned.length === 0 || mentioned.includes(requestedNumber);
 }
 
 function candidate(
@@ -55,6 +62,7 @@ export class RuleBasedExtractor implements CandidateExtractor {
 
     for (const snapshot of snapshots) {
       signal.throwIfAborted();
+      let descriptionAdded = false;
       const registered = this.registry[snapshot.sourceId];
       const authority: Authority = registered?.authority ?? (snapshot.kind === "official" ? "institution" : "unknown");
       const authorityBasis = registered?.basis ?? (snapshot.kind === "official" ? "Source is registered as official" : null);
@@ -73,12 +81,12 @@ export class RuleBasedExtractor implements CandidateExtractor {
         const isDeadline =
           /(?:registration|application|submission|RSVP|tickets?|assignment|homework|problem set)/i.test(sentence)
           && /(?:closes?|deadline|due|by|extended)\b/i.test(sentence);
-        if (requested(plan, "deadline") && isDeadline) {
+        if (requested(plan, "deadline") && isDeadline && matchesRequestedAssignment(plan, sentence)) {
           const dateRaw = sentence.match(DATE)?.[0];
           if (dateRaw) results.push(candidate(snapshot, "deadline", sentence, sentence, authority, authorityBasis, { dateRaw, dedupeValue: dateRaw }));
         }
 
-        if (requested(plan, "event_date", "date") && !isDeadline && /(?:\bdate\s*:|\bwhen\s*:|\bevent\b|meeting|workshop|orientation|talk|lecture|hackathon|club)/i.test(sentence)) {
+        if (requested(plan, "event_date", "date") && !isDeadline && /(?:\bdate\s*:|\bwhen\s*:|\bevent\b|meeting|workshop|orientation|talk|lecture|hackathon|club|recital|carillon)/i.test(sentence)) {
           const dateRaw = sentence.match(DATE)?.[0];
           if (dateRaw) results.push(candidate(snapshot, "event_date", sentence, sentence, authority, authorityBasis, { dateRaw, dedupeValue: dateRaw }));
         }
@@ -88,7 +96,7 @@ export class RuleBasedExtractor implements CandidateExtractor {
           if (time) results.push(candidate(snapshot, "event_time", time, sentence, authority, authorityBasis, { dedupeValue: time }));
         }
 
-        if (requested(plan, "location", "campus") && /(?:location|venue|room|building|online|zoom|campus|where\s*:)/i.test(sentence)) {
+        if (requested(plan, "location", "campus") && /(?:location|venue|room|building|online|zoom|campus|where\s*:|\d+\s+[A-Za-z'’.-]+(?:\s+[A-Za-z'’.-]+){0,3}\s+(?:Street|St|Road|Rd|Avenue|Ave|Circle|Lane|Ln)\b)/i.test(sentence)) {
           results.push(candidate(snapshot, "location", sentence, sentence, authority, authorityBasis));
         }
 
@@ -96,8 +104,16 @@ export class RuleBasedExtractor implements CandidateExtractor {
           results.push(candidate(snapshot, "organizer", sentence, sentence, authority, authorityBasis));
         }
 
-        if (requested(plan, "event_description") && /(?:event|meeting|workshop|orientation|talk|lecture|hackathon|club)/i.test(sentence)) {
+        if (
+          requested(plan, "event_description") &&
+          !descriptionAdded &&
+          sentence.length >= 50 &&
+          sentence.length <= 320 &&
+          !/(?:questions?|contact|related events|visible link|share this)/i.test(sentence) &&
+          /(?:event|meeting|workshop|orientation|talk|lecture|hackathon|club|recital|carillon)/i.test(sentence)
+        ) {
           results.push(candidate(snapshot, "event_description", sentence, sentence, authority, authorityBasis));
+          descriptionAdded = true;
         }
 
         if (requested(plan, "submission_format") && /(?:submit|submission|upload)/i.test(sentence) && /\b(?:PDF|DOCX?|ZIP|PPTX?)\b/i.test(sentence)) {

@@ -9,6 +9,8 @@
     "smoke:live": "tsx scripts/smoke-live-run.ts",
     "smoke:live-event": "tsx scripts/smoke-live-event.ts",
     "smoke:planner": "tsx scripts/smoke-openai-planner.ts",
+    "verify:live-answer": "tsx scripts/verify-live-answer.ts",
+    "verify:live-fixture": "tsx scripts/verify-live-fixture.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },

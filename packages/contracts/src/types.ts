@@ -16,6 +16,7 @@ import type {
   DateValueSchema,
   EventEnvelopeSchema,
   EvidenceSchema,
+  ExecutionKindSchema,
   FailureCodeSchema,
   KeyDateSchema,
   PageSnapshotSchema,
@@ -33,6 +34,7 @@ import type {
   SourceConfigSchema,
   SourceFailureSchema,
   SourceKindSchema,
+  ViewerStateSchema,
 } from "./schemas.js";
 
 export type Scope = z.infer<typeof ScopeSchema>;
@@ -62,6 +64,8 @@ export type CancelRunResponse = z.infer<typeof CancelRunResponseSchema>;
 export type EventEnvelope = z.infer<typeof EventEnvelopeSchema>;
 export type SourceKind = z.infer<typeof SourceKindSchema>;
 export type RunMode = z.infer<typeof RunModeSchema>;
+export type ExecutionKind = z.infer<typeof ExecutionKindSchema>;
+export type ViewerState = z.infer<typeof ViewerStateSchema>;
 export type ContentMode = z.infer<typeof ContentModeSchema>;
 export type Authority = z.infer<typeof AuthoritySchema>;
 export type FailureCode = z.infer<typeof FailureCodeSchema>;

@@ -31,8 +31,7 @@ describe('question routing', () => {
     const input = buildQueryInput('When is the Labour Day Carillon Recital?');
     assert.deepEqual(input.sourceIds, [
       'alumni-carillon-recital',
-      'uoft-events',
-      'student-life-events',
+      'soldiers-tower-features',
     ]);
   });
 
@@ -46,13 +45,32 @@ describe('question routing', () => {
     ]);
     assert.equal(input.scope.course, 'CSC207H1');
   });
+
+  it('keeps every DEMO101 question inside the labeled fixture corpus', () => {
+    for (const question of ['What is the DEMO101 submission format?', 'When is the DEMO101 final exam?']) {
+      const input = buildQueryInput(question);
+      assert.equal(input.mode, 'LIVE_FIXTURE');
+      assert.deepEqual(input.sourceIds, [
+        'demo101-syllabus',
+        'demo101-announcement',
+        'demo101-student-discussion',
+      ]);
+    }
+  });
+
+  it('does not silently substitute CSC207 for an unknown course', () => {
+    const input = buildQueryInput('When is MAT223 Assignment 2 due?');
+    assert.deepEqual(input.sourceIds, ['piazza-login', 'quercus-login']);
+    assert.equal(input.scope.course, 'MAT223H1');
+    assert.equal(input.scope.entity, 'Assignment 2');
+  });
 });
 
 describe('fixed search architecture', () => {
   it('detects sites before a split for every question kind', () => {
     const cases = [
       ['What are the prerequisites for CSC207H1?', 3],
-      ['When is the Labour Day Carillon Recital?', 3],
+      ['When is the Labour Day Carillon Recital?', 2],
       ['When is the Arts & Science December 2026 exam period?', 3],
       ['When is CSC207 Assignment 2 due?', 3],
     ];

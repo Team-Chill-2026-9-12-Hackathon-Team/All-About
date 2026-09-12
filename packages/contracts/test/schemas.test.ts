@@ -99,11 +99,15 @@ describe("HTTP boundary schemas", () => {
     });
     RunSnapshotSchema.parse({
       runId: "run-1",
+      mode: "LIVE_WEB",
+      executionKind: "steel_live_web",
       status: "queued",
       answer: null,
       lastSeq: 1,
       cleanup: null,
       viewerUrl: null,
+      viewerState: "unavailable",
+      clarification: null,
     });
     ClarificationRequestSchema.parse({
       scopePatch: { term: "Fall 2026" },

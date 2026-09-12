@@ -8,7 +8,11 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "./scripts/dev-all.sh",
     "dev:server": "npm run dev --workspace @allabout/server",
+    "dev:web": "npm --prefix apps/web run dev",
+    "check:local": "node scripts/check-local.mjs",
+    "demo:preflight": "node scripts/demo-preflight.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
   },

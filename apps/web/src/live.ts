@@ -5,7 +5,7 @@ export { classifyQuestion, detectSearch } from './search-architecture.ts';
 
 // ---- Shared contract shapes (structural mirror of @allabout/contracts) ----
 
-export type RunMode = 'LIVE_WEB' | 'LIVE_FIXTURE' | 'REPLAY';
+export type RunMode = 'LIVE_WEB' | 'LIVE_FIXTURE' | 'LOCAL_FIXTURE' | 'REPLAY';
 
 export type RunStatus =
   | 'queued'
@@ -78,6 +78,13 @@ export interface AnswerConflict {
   evidenceIds: string[];
 }
 
+export interface CoverageReceipt {
+  sourceId: string;
+  status: 'checked' | 'partial' | 'blocked' | 'not_checked';
+  reason: string | null;
+  snapshotIds: string[];
+}
+
 export interface AnswerBundle {
   schemaVersion: string;
   runId: string;
@@ -90,7 +97,7 @@ export interface AnswerBundle {
   evidence: Evidence[];
   conflicts: AnswerConflict[];
   keyDates: KeyDate[];
-  coverage: unknown[];
+  coverage: CoverageReceipt[];
   sources: PublicSource[];
   generatedAt: string;
 }
@@ -109,6 +116,8 @@ export interface LiveRun {
   question: string;
   createdAt: number;
   mode: RunMode;
+  executionKind: 'steel_live_web' | 'steel_live_fixture' | 'local_fixture' | 'replay';
+  viewerState: 'unavailable' | 'ready' | 'closed' | 'cleanup_failed';
   status: RunStatus;
   viewerUrl: string | null;
   viewerClosed: boolean;
@@ -121,6 +130,36 @@ export interface LiveRun {
   error: { code: string; message: string } | null;
   clarification: { question: string; missingFields: string[] } | null;
   lastSeq: number;
+}
+
+export type PresentationState =
+  | 'idle'
+  | 'local_demo_running'
+  | 'live_connecting'
+  | 'live_viewer_ready'
+  | 'answer_ready'
+  | 'partial_answer'
+  | 'needs_input'
+  | 'failed'
+  | 'cancelled';
+
+export function presentationState(run: LiveRun | null): PresentationState {
+  if (!run) return 'idle';
+  if (run.status === 'needs_input') return 'needs_input';
+  if (run.status === 'failed') return 'failed';
+  if (run.status === 'cancelled') return 'cancelled';
+  if (run.status === 'partial') return 'partial_answer';
+  if (run.status === 'completed') return 'answer_ready';
+  if (run.executionKind === 'local_fixture') return 'local_demo_running';
+  if (run.viewerState === 'ready') return 'live_viewer_ready';
+  return 'live_connecting';
+}
+
+function executionKind(mode: RunMode): LiveRun['executionKind'] {
+  if (mode === 'LIVE_WEB') return 'steel_live_web';
+  if (mode === 'LIVE_FIXTURE') return 'steel_live_fixture';
+  if (mode === 'LOCAL_FIXTURE') return 'local_fixture';
+  return 'replay';
 }
 
 const TERMINAL: RunStatus[] = ['completed', 'partial', 'failed', 'cancelled'];
@@ -139,6 +178,13 @@ const STATUS_LABEL: Record<RunStatus, string> = {
   cancelled: 'Stopped',
 };
 export const statusLabel = (s: RunStatus) => STATUS_LABEL[s];
+
+export function eventStreamHeaders(runId: string, lastSeq: number): Record<string, string> {
+  return {
+    accept: 'text/event-stream',
+    ...(lastSeq > 0 ? { 'Last-Event-ID': `${runId}:${lastSeq}` } : {}),
+  };
+}
 
 // ---- Query building (fixed detect → split architecture) ----
 
@@ -196,9 +242,9 @@ export function preferPrimaryPage<T extends { title: string; url: string; source
 }
 
 export const SOURCE_META: Record<string, {label: string; url: string}> = {
-  'demo101-syllabus': {label: 'DEMO101 syllabus', url: 'https://fixture.example.edu/demo101/syllabus'},
-  'demo101-announcement': {label: 'DEMO101 announcement', url: 'https://fixture.example.edu/demo101/announcement'},
-  'demo101-student-discussion': {label: 'DEMO101 discussion', url: 'https://fixture.example.edu/demo101/discussion'},
+  'demo101-syllabus': {label: 'DEMO101 syllabus', url: 'https://gist.githubusercontent.com/Jesse-Zeng423/51c8f84bf6a9c41595cafcaf6bb04145/raw/demo101-syllabus.txt'},
+  'demo101-announcement': {label: 'DEMO101 announcement', url: 'https://gist.githubusercontent.com/Jesse-Zeng423/51c8f84bf6a9c41595cafcaf6bb04145/raw/demo101-announcement.txt'},
+  'demo101-student-discussion': {label: 'DEMO101 discussion', url: 'https://gist.githubusercontent.com/Jesse-Zeng423/51c8f84bf6a9c41595cafcaf6bb04145/raw/demo101-discussion.txt'},
   'academic-calendar-csc207': {label: 'CSC207 calendar', url: 'https://artsci.calendar.utoronto.ca/course/csc207h1'},
   'academic-calendar-csc148': {label: 'CSC148 calendar', url: 'https://artsci.calendar.utoronto.ca/course/csc148h1'},
   'cs-undergrad-courses': {label: 'CS department', url: 'https://web.cs.toronto.edu/undergraduate/courses'},
@@ -209,6 +255,7 @@ export const SOURCE_META: Record<string, {label: string; url: string}> = {
   'quercus-login': {label: 'Quercus', url: 'https://q.utoronto.ca/'},
   'acorn-login': {label: 'ACORN', url: 'https://www.acorn.utoronto.ca/'},
   'alumni-carillon-recital': {label: 'Alumni events', url: 'https://alumni.utoronto.ca/events/labour-day-carillon-recital-0'},
+  'soldiers-tower-features': {label: "Soldiers' Tower", url: 'https://alumni.utoronto.ca/community/soldiers-tower/features-of-soldiers-tower'},
   'uoft-events': {label: 'U of T Events', url: 'https://www.utoronto.ca/events'},
   'student-life-events': {label: 'Student Life', url: 'https://www.studentlife.utoronto.ca/events/'},
   'hart-house-events': {label: 'Hart House', url: 'https://harthouse.ca/events/month'},
@@ -263,6 +310,7 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
 
   const streamAbortRef = useRef<AbortController | null>(null);
   const activeIdRef = useRef<string | null>(null);
+  const lastSeqRef = useRef(0);
   const settledRef = useRef(onSettled);
   settledRef.current = onSettled;
 
@@ -276,12 +324,11 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
   const applyEvent = useCallback((env: EventEnvelope) => {
     setRun((prev) => {
       if (!prev) return prev;
-      const accepted =
-        prev.id === env.runId ||
-        prev.id === 'detecting' ||
-        (activeIdRef.current !== null && env.runId === activeIdRef.current);
+      const accepted = activeIdRef.current === env.runId &&
+        (prev.id === env.runId || prev.id === 'detecting');
       if (!accepted) return prev;
       if (env.seq <= prev.lastSeq) return prev;
+      lastSeqRef.current = env.seq;
 
       const next: LiveRun = {
         ...prev,
@@ -293,6 +340,16 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
       };
 
       switch (env.type) {
+        case 'execution_changed': {
+          next.mode = env.payload.mode as RunMode;
+          next.executionKind = env.payload.executionKind as LiveRun['executionKind'];
+          next.viewerState = 'unavailable';
+          next.viewerUrl = null;
+          next.viewerClosed = true;
+          next.viewerReason = String(env.payload.reason ?? 'unavailable');
+          push({ kind: 'status', title: 'Using clearly labeled local demo data', detail: 'The network fixture was unavailable.' });
+          break;
+        }
         case 'run_status': {
           const status = env.payload.status as RunStatus;
           next.status = status;
@@ -300,6 +357,7 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
             push({ kind: 'status', title: statusLabel(status) });
           }
           if (isTerminal(status)) {
+            activeIdRef.current = null;
             closeStream();
             queueMicrotask(() => settledRef.current?.(next));
           }
@@ -307,6 +365,7 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
         }
         case 'viewer_ready': {
           next.viewerUrl = env.payload.viewerUrl as string;
+          next.viewerState = 'ready';
           next.viewerClosed = false;
           next.viewerReason = null;
           push({ kind: 'viewer', title: 'Live browser connected' });
@@ -322,9 +381,10 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
             fallback_source: 'Opened a public fallback',
             sign_in: 'Signing in with the keychain',
             credential_login: 'Signing in with the keychain',
-            navigate: 'Opening the live page',
+            navigate: next.executionKind === 'local_fixture' ? 'Opening local demo evidence' : 'Opening the browser page',
             read_visible_text: 'Reading visible text',
             hold_for_viewer: 'Holding the live browser so you can see it',
+            local_fixture_fallback: 'Network fixture unavailable · using local demo data',
           };
           push({
             kind: 'step',
@@ -371,6 +431,7 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
         case 'viewer_closed': {
           next.viewerClosed = true;
           next.viewerReason = String(env.payload.reason ?? 'released');
+          next.viewerState = env.payload.reason === 'failed' ? 'cleanup_failed' : 'closed';
           break;
         }
         case 'clarification_needed': {
@@ -397,25 +458,37 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
   // Snapshot reconcile: authoritative backstop when the SSE stream stalls
   // (e.g. a dev proxy buffering the terminal burst of events).
   const reconcile = useCallback(
-    async (id: string) => {
+    async (id: string): Promise<RunStatus | null> => {
       try {
         const res = await fetch(`/api/runs/${id}`);
-        if (!res.ok) return;
+        if (!res.ok) return null;
         const snap = (await res.json()) as {
+          mode: RunMode;
+          executionKind: LiveRun['executionKind'];
+          viewerState: LiveRun['viewerState'];
           status: RunStatus;
           answer: AnswerBundle | null;
           cleanup: string | null;
           lastSeq: number;
           viewerUrl?: string | null;
+          clarification: LiveRun['clarification'];
         };
         setRun((prev) => {
           if (!prev || prev.id !== id) return prev;
           const next: LiveRun = { ...prev };
+          next.mode = snap.mode;
+          next.executionKind = snap.executionKind;
+          next.viewerState = snap.viewerState;
           next.status = snap.status;
-          if (snap.viewerUrl && !next.viewerClosed) {
+          next.clarification = snap.clarification;
+          if (snap.viewerState === 'ready' && snap.viewerUrl) {
             next.viewerUrl = snap.viewerUrl;
             next.viewerClosed = false;
             next.viewerReason = null;
+          } else if (snap.viewerState !== 'ready') {
+            next.viewerUrl = null;
+            next.viewerClosed = snap.viewerState === 'closed' || snap.viewerState === 'cleanup_failed';
+            next.viewerReason = snap.cleanup;
           }
           if (snap.answer) {
             next.answer = snap.answer;
@@ -435,7 +508,7 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
           if (snap.status === 'failed' && !next.error) {
             next.error = {
               code: 'FAILED',
-              message: 'The live run failed before a usable page was captured. Try a course, exam, or event starter.',
+              message: 'The run failed before a usable page was captured. Try a course, exam, or event starter.',
             };
           }
           if (isTerminal(snap.status)) {
@@ -449,11 +522,14 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
               next.viewerReason = snap.cleanup === 'released' ? 'released' : 'failed';
             }
             queueMicrotask(() => settledRef.current?.(next));
+            if (activeIdRef.current === id) activeIdRef.current = null;
           }
           return next;
         });
+        return snap.status;
       } catch {
         /* ignore transient poll errors */
+        return null;
       }
     },
     [],
@@ -465,37 +541,48 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
       const abort = new AbortController();
       streamAbortRef.current = abort;
       void (async () => {
-        try {
-          const res = await fetch(eventsUrl, {
-            signal: abort.signal,
-            headers: { accept: 'text/event-stream' },
-          });
-          if (!res.body) return;
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = '';
-          while (!abort.signal.aborted) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const frames = buffer.split('\n\n');
-            buffer = frames.pop() ?? '';
-            for (const frame of frames) {
-              const data = frame
-                .split('\n')
-                .filter((line) => line.startsWith('data: '))
-                .map((line) => line.slice(6))
-                .join('');
-              if (!data) continue;
-              try {
-                applyEvent(JSON.parse(data) as EventEnvelope);
-              } catch {
-                /* ignore malformed frame */
+        const runId = eventsUrl.split('/').at(-2) ?? '';
+        let retry = 0;
+        while (!abort.signal.aborted && activeIdRef.current === runId) {
+          try {
+            const cursor = lastSeqRef.current;
+            const res = await fetch(eventsUrl, {
+              signal: abort.signal,
+              headers: eventStreamHeaders(runId, cursor),
+            });
+            if (!res.ok || !res.body) throw new Error(`Event stream HTTP ${res.status}`);
+            retry = 0;
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            while (!abort.signal.aborted) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const frames = buffer.split('\n\n');
+              buffer = frames.pop() ?? '';
+              for (const frame of frames) {
+                const data = frame
+                  .split('\n')
+                  .filter((line) => line.startsWith('data: '))
+                  .map((line) => line.slice(6))
+                  .join('');
+                if (!data) continue;
+                try {
+                  applyEvent(JSON.parse(data) as EventEnvelope);
+                } catch {
+                  /* ignore malformed frame */
+                }
               }
             }
+          } catch {
+            if (abort.signal.aborted) return;
           }
-        } catch {
-          if (!abort.signal.aborted && activeIdRef.current) void reconcile(activeIdRef.current);
+          if (abort.signal.aborted || activeIdRef.current !== runId) return;
+          const status = await reconcile(runId);
+          if (status && isTerminal(status)) return;
+          retry += 1;
+          await new Promise((resolve) => setTimeout(resolve, Math.min(250 * 2 ** retry, 2000)));
         }
       })();
     },
@@ -515,6 +602,8 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
         }
       }
       closeStream();
+      activeIdRef.current = null;
+      lastSeqRef.current = 0;
       setTransportError(null);
       setExecutionUnavailable(false);
 
@@ -527,6 +616,8 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
         question: trimmed,
         createdAt,
         mode: queryInput.mode,
+        executionKind: executionKind(queryInput.mode),
+        viewerState: 'unavailable',
         status: 'planning',
         viewerUrl: null,
         viewerClosed: false,
@@ -561,11 +652,14 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
         }
         const body = (await res.json()) as { runId: string; eventsUrl: string };
         activeIdRef.current = body.runId;
+        lastSeqRef.current = 0;
         setRun((prev) => ({
           id: body.runId,
           question: trimmed,
           createdAt,
           mode: queryInput.mode,
+          executionKind: executionKind(queryInput.mode),
+          viewerState: 'unavailable',
           status: 'queued',
           viewerUrl: null,
           viewerClosed: false,
@@ -594,32 +688,62 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
     if (!id) return;
     setRun((prev) => (prev ? { ...prev, status: 'cancelling' } : prev));
     try {
-      await fetch(`/api/runs/${id}/cancel`, { method: 'POST' });
-    } catch {
-      /* backend will still terminate the run */
+      const response = await fetch(`/api/runs/${id}/cancel`, { method: 'POST' });
+      if (!response.ok) throw new Error(`Cancel failed (HTTP ${response.status}).`);
+      const body = (await response.json()) as { runId: string; status: RunStatus };
+      if (body.runId !== id || body.status !== 'cancelled') {
+        throw new Error('The backend did not confirm cancellation.');
+      }
+      let cleanupConfirmed = false;
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        const snapshotResponse = await fetch(`/api/runs/${id}`);
+        if (!snapshotResponse.ok) break;
+        const snapshot = (await snapshotResponse.json()) as {
+          viewerState: LiveRun['viewerState'];
+          cleanup: string | null;
+        };
+        if (snapshot.cleanup !== null) {
+          cleanupConfirmed = true;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      await reconcile(id);
+      if (!cleanupConfirmed) {
+        throw new Error('Cancellation was confirmed, but viewer cleanup was not confirmed in time.');
+      }
+      closeStream();
+      activeIdRef.current = null;
+    } catch (error) {
+      setTransportError(error instanceof Error ? error.message : 'Could not confirm cancellation.');
+      await reconcile(id);
     }
-  }, []);
+  }, [closeStream, reconcile]);
 
   const clarify = useCallback(async (answer: string) => {
     const id = activeIdRef.current;
     if (!id || !answer.trim()) return;
     setRun((prev) => (prev ? { ...prev, clarification: null } : prev));
     try {
-      await fetch(`/api/runs/${id}/clarification`, {
+      const response = await fetch(`/api/runs/${id}/clarification`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ scopePatch: {}, answer: answer.trim() }),
       });
+      if (!response.ok) throw new Error(`Clarification failed (HTTP ${response.status}).`);
+      await reconcile(id);
     } catch (err) {
       setTransportError(
         err instanceof Error ? err.message : 'Could not send the clarification.',
       );
+      await reconcile(id);
     }
-  }, []);
+  }, [reconcile]);
 
   const restore = useCallback(
     async (item: { id: string; question: string; createdAt: number; mode?: string; status?: string }) => {
       closeStream();
+      lastSeqRef.current = 0;
       setTransportError(null);
       setExecutionUnavailable(false);
       activeIdRef.current = item.id;
@@ -632,6 +756,8 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
             question: item.question,
             createdAt: item.createdAt,
             mode: (item.mode as RunMode) || 'LIVE_WEB',
+            executionKind: executionKind((item.mode as RunMode) || 'LIVE_WEB'),
+            viewerState: 'unavailable',
             status: 'completed',
             viewerUrl: null,
             viewerClosed: true,
@@ -643,7 +769,7 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
             answer: null,
             error: {
               code: 'EXPIRED',
-              message: 'That live run is no longer on the server. Ask again to search the real page.',
+              message: 'That run is no longer on the server. Ask again to start a new search.',
             },
             clarification: null,
             lastSeq: 0,
@@ -651,16 +777,23 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
           return;
         }
         const snap = (await res.json()) as {
+          mode: RunMode;
+          executionKind: LiveRun['executionKind'];
+          viewerState: LiveRun['viewerState'];
           status: RunStatus;
           answer: AnswerBundle | null;
           lastSeq: number;
           cleanup: string | null;
+          clarification: LiveRun['clarification'];
         };
+        lastSeqRef.current = snap.lastSeq ?? 0;
         setRun({
           id: item.id,
           question: item.question,
           createdAt: item.createdAt,
-          mode: (item.mode as RunMode) || 'LIVE_WEB',
+          mode: snap.mode,
+          executionKind: snap.executionKind,
+          viewerState: snap.viewerState,
           status: snap.status,
           viewerUrl: null,
           viewerClosed: isTerminal(snap.status),
@@ -673,10 +806,10 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
           error: snap.status === 'failed' && !snap.answer
             ? {
                 code: 'FAILED',
-                message: 'The live run failed before a usable page was captured. Try a course, exam, or event starter.',
+                message: 'The run failed before a usable page was captured. Try a course, exam, or event starter.',
               }
             : null,
-          clarification: null,
+          clarification: snap.clarification,
           lastSeq: snap.lastSeq ?? 0,
         });
         if (!isTerminal(snap.status)) {
@@ -694,6 +827,7 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
   const reset = useCallback(() => {
     closeStream();
     activeIdRef.current = null;
+    lastSeqRef.current = 0;
     setRun(null);
     setTransportError(null);
     setExecutionUnavailable(false);

@@ -1,16 +1,18 @@
-import type { SourceConfig } from "@allabout/contracts";
+import type { RunSnapshot, SourceConfig } from "@allabout/contracts";
 import Fastify, { type FastifyServerOptions } from "fastify";
 
 import { registerCredentialRoutes } from "./credential-routes.js";
 import type { CredentialVault } from "./credential-vault.js";
 import { registerRunRoutes } from "./routes.js";
-import type { RunExecutor } from "./run-executor.js";
 import { RunStore } from "./run-store.js";
 
 export interface AppDependencies {
   runStore?: RunStore;
   sources?: SourceConfig[];
-  runExecutor?: Pick<RunExecutor, "start" | "cancel">;
+  runExecutor?: {
+    start: (runId: string) => void;
+    cancel: (runId: string) => RunSnapshot | Promise<RunSnapshot>;
+  };
   credentialVault?: CredentialVault;
 }
 

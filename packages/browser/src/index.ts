@@ -71,9 +71,7 @@ export async function collectPages(
   try {
     // Wait for the create response even if the run is cancelled so we retain
     // the deployment-generated session ID and can release it immediately.
-    const session = await client.sessions.create({
-      timeout: Math.min(Math.max(plan.budget.timeoutMs, 30_000), MAX_SESSION_MS),
-    });
+    const session = await createSessionWithRetry(client, plan, combinedSignal);
     createdSessionId = session.id;
     throwIfAborted(combinedSignal);
 
@@ -182,6 +180,26 @@ export async function collectPages(
   }
 
   return BrowserBatchSchema.parse({ pages, failures, cleanup });
+}
+
+async function createSessionWithRetry(
+  client: Steel,
+  plan: QueryPlan,
+  signal: AbortSignal,
+) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    throwIfAborted(signal);
+    try {
+      return await client.sessions.create({
+        timeout: Math.min(Math.max(plan.budget.timeoutMs, 30_000), MAX_SESSION_MS),
+      });
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0) await holdForViewer(1_000, signal);
+    }
+  }
+  throw lastError;
 }
 
 async function collectTarget(
@@ -293,7 +311,7 @@ async function collectTarget(
     id: `${plan.runId}:${target.id}:${pages.length + 1}`,
     sourceId: target.id,
     url: capturedUrl.href,
-    title: read.title,
+    title: read.title || target.label,
     text,
     fetchedAt: new Date().toISOString(),
     publishedAt: read.publishedAt,

@@ -8,14 +8,6 @@ Built by Team Chill for the Battle of Schools Hackathon.
 
 ## Interface preview
 
-### Sign in
-
-![AllAbout Campus sign-in screen](docs/screenshots/login.png)
-
-### Choose your campus tools
-
-![AllAbout Campus tool setup screen](docs/screenshots/tool-setup.png)
-
 ### Course Desk and Steel Live Browser
 
 ![AllAbout Campus Course Desk screen](docs/screenshots/course-desk.png)
@@ -26,19 +18,17 @@ Built by Team Chill for the Battle of Schools Hackathon.
 - **Steel live browser** — watch allowlisted pages open in a read-only Steel session.
 - **Coverage receipt** — see which sites were readable, login-walled, or skipped.
 - **History** — reopen prior questions from this browser (does not start a new Steel session).
-- **Campus tools setup** — choose Course Desk, timetable alerts, study planning, and notices.
 - **Steel keychain** — save portal usernames/passwords; they are encrypted on the server and used only for exact login hosts.
-- **30-day sign-in option** — keep the local demo account session on this browser.
 
 ## Product flow
 
 ```text
-Sign in → choose campus tools → Course Desk
-                                 ├─ Ask a course or event question
-                                 ├─ Watch Steel review source pages
-                                 ├─ Read cited answer and evidence
-                                 ├─ Reopen prior work from History
-                                 └─ Manage website accounts with Steel keychain
+Course Desk
+├─ Ask a course or event question
+├─ Watch Steel review source pages
+├─ Read cited answer and evidence
+├─ Reopen prior work from History
+└─ Manage website accounts with Steel keychain
 ```
 
 ## Tech stack
@@ -52,7 +42,7 @@ Sign in → choose campus tools → Course Desk
 
 ## Run locally
 
-Requirements: Node.js 20+, npm, and pnpm (frontend).
+Requirements: Node.js 20+ and npm.
 
 Copy `.env.example` to `.env` and fill `OPENAI_API_KEY`, `OPENAI_MODEL`, and `STEEL_API_KEY`. The credential vault key is created automatically under `.data/` if omitted.
 
@@ -61,22 +51,27 @@ git clone https://github.com/Team-Chill-2026-9-12-Hackathon-Team/All-About.git
 cd All-About
 npm install
 
-# terminal 1
-npm run start --workspace @allabout/server
+# install the separately packaged frontend once
+npm --prefix apps/web install
 
-# terminal 2
-cd apps/web
-pnpm install
-pnpm dev
+# start the backend and frontend together
+npm run dev
 ```
 
-Open the address Vite prints, usually `http://127.0.0.1:5173`. The web app proxies `/api` to `http://127.0.0.1:3001`.
+Open `http://127.0.0.1:5174`. The port is fixed and strict so a second Vite process cannot silently move the app to another address. The web app proxies `/api` to `http://127.0.0.1:3001`.
+
+Verify both the backend and the frontend proxy before a demo:
+
+```bash
+npm run check:local
+npm run demo:preflight
+```
 
 ## Demo notes
 
 - Public calendar/event pages run as `LIVE_WEB`.
-- DEMO101 uses local fixtures (`LIVE_FIXTURE`) and is labeled as such.
-- The 30-day sign-in preference is stored in this browser only.
+- DEMO101 uses a real Steel session to browse public, explicitly fictional pages (`LIVE_FIXTURE`).
+- If those network fixtures are unavailable, the server falls back to bundled fictional data and changes the mode to `LOCAL_FIXTURE`.
 - Keychain passwords are encrypted on the server; they are never sent to the language model.
 - Quercus/Piazza still need a saved keychain account, and UTORMFA cannot be completed automatically.
 

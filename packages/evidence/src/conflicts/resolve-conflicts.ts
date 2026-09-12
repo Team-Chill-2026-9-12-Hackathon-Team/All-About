@@ -9,21 +9,53 @@ function dateKey(claim: Claim): string | null {
   return JSON.stringify(claim.dateValue);
 }
 
-function isExplicitUpdate(claim: Claim, evidenceById: Map<string, Evidence>): boolean {
+function snapshotTime(snapshot: PageSnapshot | undefined): number | null {
+  const raw = snapshot?.updatedAt
+    ?? snapshot?.publishedAt
+    ?? snapshot?.text.match(/^Published:\s*(.+)$/im)?.[1]
+    ?? null;
+  if (!raw) return null;
+  const value = Date.parse(raw.replace(/\s+at\s+/i, " "));
+  return Number.isFinite(value) ? value : null;
+}
+
+function isExplicitUpdate(
+  claim: Claim,
+  group: Claim[],
+  evidenceById: Map<string, Evidence>,
+  snapshotsById: Map<string, PageSnapshot>,
+): boolean {
   return claim.evidenceIds.some((id) => {
     const item = evidenceById.get(id);
-    if (!item || item.authority !== "instructor") return false;
-    return /\b(?:extend(?:ed)?|postpone(?:d)?|reschedule(?:d)?|moved?\s+to|new deadline)\b/i.test(item.quote);
+    const updateSnapshot = item ? snapshotsById.get(item.snapshotId) : undefined;
+    if (
+      !item ||
+      item.authority !== "instructor" ||
+      !item.authorityBasis?.trim() ||
+      updateSnapshot?.kind !== "official" ||
+      !/\b(?:extend(?:ed)?|postpone(?:d)?|reschedule(?:d)?|moved?\s+to|new deadline)\b/i.test(item.quote)
+    ) return false;
+    const updateTime = snapshotTime(updateSnapshot);
+    if (updateTime === null) return false;
+    return group
+      .filter((other) => other.id !== claim.id)
+      .flatMap((other) => other.evidenceIds)
+      .every((otherId) => {
+        const other = evidenceById.get(otherId);
+        const otherTime = snapshotTime(other ? snapshotsById.get(other.snapshotId) : undefined);
+        return otherTime !== null && updateTime >= otherTime;
+      });
   });
 }
 
 export function resolveConflicts(
   claims: Claim[],
   evidence: Evidence[],
-  _snapshots: PageSnapshot[],
+  snapshots: PageSnapshot[],
 ): { claims: Claim[]; conflicts: Conflict[]; keyDates: KeyDate[] } {
   const resolved = claims.map((claim) => ({ ...claim }));
   const evidenceById = new Map(evidence.map((item) => [item.id, item]));
+  const snapshotsById = new Map(snapshots.map((snapshot) => [snapshot.id, snapshot]));
   const groups = new Map<string, Claim[]>();
 
   for (const claim of resolved) {
@@ -37,7 +69,7 @@ export function resolveConflicts(
     const distinctDates = new Set(group.map(dateKey));
     if (distinctDates.size < 2) continue;
 
-    const updates = group.filter((claim) => isExplicitUpdate(claim, evidenceById));
+    const updates = group.filter((claim) => isExplicitUpdate(claim, group, evidenceById, snapshotsById));
     if (updates.length === 1) {
       const selected = updates[0]!;
       for (const claim of group) claim.status = claim.id === selected.id ? "supported" : "superseded";

@@ -2,12 +2,12 @@ import React, {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {
   AlarmClock, ArrowRight, ArrowUp, ArrowUpRight, BellRing, BookOpen, CalendarDays, Check, ChevronDown,
-  Eye, EyeOff, Globe, GraduationCap, History, KeyRound, LayoutGrid, LoaderCircle, Mail, MessageSquare, Monitor, Smartphone,
+  Eye, EyeOff, Globe, GraduationCap, History, KeyRound, LoaderCircle, Mail, MessageSquare, Monitor, Smartphone,
   Plus, RotateCcw, Search, SlidersHorizontal, Square, Trash2, Upload, X,
 } from 'lucide-react';
 import {HISTORY_KEY, SETTINGS_KEY, readHistory, readPreferences, type HistoryItem, type Preferences} from './history';
 import {
-  classifyQuestion, detectSearch, hostOf, isTerminal, SOURCE_META, statusLabel, useLiveRun,
+  classifyQuestion, detectSearch, hostOf, isTerminal, presentationState, SOURCE_META, statusLabel, useLiveRun,
   type AnswerBundle, type Evidence, type LiveRun,
 } from './live';
 import { coverageForKind, coverageSite } from './coverage-catalog.ts';
@@ -16,11 +16,9 @@ import { VaultDrawer } from './VaultDrawer';
 import './desk.css';
 
 const starterQuestions = [
-  {label: 'Course · CSC207 prerequisites', question: 'What are the prerequisites for CSC207H1?'},
-  {label: 'Event · Labour Day Carillon Recital', question: 'When and where is the Labour Day Carillon Recital, and is it free?'},
-  {label: 'Exam · December 2026 exam period', question: 'When is the Arts & Science December 2026 exam period, and what counts as an exam conflict?'},
-  {label: 'Assignment · CSC207 A2 due date', question: 'When is CSC207 Assignment 2 due?'},
   {label: 'Demo · DEMO101 A2 deadline update', question: 'Did the DEMO101 A2 deadline change?'},
+  {label: 'Live · Carillon date, place, access', question: 'When and where is the Labour Day Carillon Recital, and is it free?'},
+  {label: 'Live · Carillon and Soldiers’ Tower', question: "When is the Labour Day Carillon Recital and what is the Soldiers' Tower carillon?"},
 ];
 
 const FIELD_LABEL: Record<string, string> = {
@@ -235,13 +233,22 @@ function AnswerView({
   const lead = clip(
     missingDue
       ? unknown
-      : facts[0]?.text ?? answer.summary[0]?.text ?? 'Live pages were read. Open citations for the original wording.',
+      : facts[0]?.text ?? answer.summary[0]?.text ?? 'Source receipts are available. Open citations for the original wording.',
     180,
   );
   const groups = citationGroups(answer);
+  const primaryEvidence = answer.evidence.find((item) => item.id === facts[0]?.evidenceIds[0]) ?? answer.evidence[0];
   return (
     <div className="answer answer-card">
+      <div className="answer-hero-head">
+        <span>Answer</span>
+        <b>{answer.mode}</b>
+        {primaryEvidence && <small>{primaryEvidence.authority} source</small>}
+      </div>
       <p className="answer-lead">{lead}</p>
+      {unknown && !missingDue && (
+        <p className="unknowns">Not on these pages: {clip(unknown, 140)}</p>
+      )}
       <DeadlineDetective answer={answer} onCite={onCite} />
       <ul className="fact-list">
         {facts.slice(1).map((fact) => (
@@ -259,11 +266,13 @@ function AnswerView({
           <b>{answer.keyDates[0].label}</b> {formatDateValue(answer.keyDates[0].value)}
         </p>
       )}
-      {unknown && !missingDue && (
-        <p className="unknowns">Not on these pages: {clip(unknown, 140)}</p>
-      )}
       {answer.communityNotes[0] && (
-        <p className="community-note">Student note, not policy: {clip(answer.communityNotes[0].text, 160)}</p>
+        <div className="community-note">
+          <span>Student note, not policy: {clip(answer.communityNotes[0].text, 160)}</span>
+          {answer.communityNotes[0].evidenceIds.slice(0, 1).map((id) => (
+            <Cite key={id} answer={answer} id={id} onCite={onCite} />
+          ))}
+        </div>
       )}
       {canExport && (
         <a className="retry" href={`/api/runs/${runId}/calendar.ics`}>Download confirmed dates (.ics)</a>
@@ -302,13 +311,76 @@ function AnswerView({
 
 function connectionLabel(run: LiveRun | null): {text: string; online: boolean} {
   if (!run) return {text: 'Waiting', online: false};
-  if (run.viewerUrl && !run.viewerClosed) return {text: 'Online', online: true};
-  if (run.viewerClosed) return {text: `Viewer ${run.viewerReason ?? 'closed'}`, online: false};
+  if (run.executionKind === 'local_fixture') return {text: 'Local demo data', online: false};
+  if (run.viewerState === 'ready') return {text: 'Online', online: true};
+  if (run.viewerState === 'closed') return {text: 'Viewer released', online: false};
+  if (run.viewerState === 'cleanup_failed') return {text: 'Viewer release failed', online: false};
   if (!isTerminal(run.status)) return {text: 'Connecting', online: false};
   return {text: 'Viewer unavailable', online: false};
 }
 
-function Workspace({features = [], onBack, onLogout}: {features: string[]; onBack: () => void; onLogout: () => void}) {
+function viewerDetail(run: LiveRun | null): string {
+  if (!run) return 'Waiting for a task';
+  if (run.executionKind === 'local_fixture') return 'No viewer · local fixture';
+  if (run.viewerState === 'ready') return 'Read-only Steel session';
+  if (run.viewerState === 'closed') return 'Viewer closed after cleanup';
+  if (run.viewerState === 'cleanup_failed') return 'Viewer release failed · manual cleanup required';
+  return 'Viewer not created';
+}
+
+function EvidenceWorkspace({run, selectedEvidenceId}: {run: LiveRun; selectedEvidenceId: string | null}) {
+  const answer = run.answer;
+  if (!answer) return null;
+  const selectedEvidence = answer.evidence.find((item) => item.id === selectedEvidenceId) ?? answer.evidence[0];
+  const source = answer.sources.find((item) => item.id === selectedEvidence?.snapshotId) ?? answer.sources[0];
+  if (!source) return null;
+  const quotes = answer.evidence.filter((item) => item.snapshotId === source.id).slice(0, 4);
+  return (
+    <article className="evidence-workspace" aria-label="Evidence workspace">
+      <div className="evidence-kicker"><span>Evidence receipt</span><b>{source.contentMode}</b></div>
+      <h2>{source.title}</h2>
+      <a href={source.url} target="_blank" rel="noreferrer">{source.url}</a>
+      <dl>
+        <div><dt>Captured</dt><dd>{new Date(source.fetchedAt).toLocaleString('en-CA')}</dd></div>
+        <div><dt>Source type</dt><dd>{source.kind}</dd></div>
+        <div><dt>Run mode</dt><dd>{run.mode}</dd></div>
+      </dl>
+      <div className="evidence-quotes">
+        {quotes.map((item) => (
+          <blockquote key={item.id} className={item.id === selectedEvidence?.id ? 'selected' : ''}>
+            <small>Quote {evidenceIndex(answer, item.id) + 1} · {item.authority}</small>
+            {item.quote}
+          </blockquote>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function CoverageReceipts({answer}: {answer: AnswerBundle}) {
+  return (
+    <ul className="coverage-board coverage-receipts" aria-label="Backend coverage receipts">
+      {answer.coverage.map((receipt) => {
+        const sources = answer.sources.filter((source) => receipt.snapshotIds.includes(source.id));
+        const evidenceCount = answer.evidence.filter((item) => receipt.snapshotIds.includes(item.snapshotId)).length;
+        const latest = sources.map((source) => source.fetchedAt).sort().at(-1);
+        const mode = sources[0]?.contentMode ?? 'none';
+        return (
+          <li key={receipt.sourceId} className={`is-${receipt.status}`}>
+            <b>{SOURCE_META[receipt.sourceId]?.label ?? receipt.sourceId} · {receipt.status}</b>
+            <small>
+              {receipt.snapshotIds.length} receipt{receipt.snapshotIds.length === 1 ? '' : 's'} · {evidenceCount} contributing fact{evidenceCount === 1 ? '' : 's'} · {mode}
+              {latest ? ` · ${new Date(latest).toLocaleTimeString('en-CA', {hour: '2-digit', minute: '2-digit'})}` : ''}
+            </small>
+            {receipt.reason && <small className="receipt-reason">{receipt.reason}</small>}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function Workspace() {
   const [input, setInput] = useState('');
   const [history, setHistory] = useState(readHistory);
   const [prefs, setPrefs] = useState(readPreferences);
@@ -345,6 +417,7 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
   const run = live.run;
   const active = !!run && !isTerminal(run.status);
   const connection = connectionLabel(run);
+  const presentation = presentationState(run);
 
   useEffect(() => {
     try {
@@ -364,6 +437,9 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
   useEffect(() => {
     if (run && run.id !== 'detecting') persist(run);
   }, [run?.id, run?.status]);
+  useEffect(() => {
+    if (run?.answer) setActivityOpen(false);
+  }, [run?.answer]);
   useEffect(() => {
     if (!run) {
       setArchPhase('detect');
@@ -504,14 +580,13 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
       <div className="landscape" aria-hidden="true" />
       <div className="background-wordmark" aria-hidden="true">ALLABOUT CAMPUS</div>
       <header className="app-header">
-        <button className="brand brand-button" aria-label="Return to sign in" onClick={onLogout}>
+        <button className="brand brand-button" aria-label="Start a new task" onClick={() => void reset()}>
           <span className="logo">a.</span>
           <strong>AllAbout <span>Campus</span></strong>
         </button>
         <div className="header-actions">
-          <button className="tools-back" onClick={onBack}><LayoutGrid size={16} />My tools</button>
           <span className="term">U of T · Fall 2026</span>
-          <span className="mode-chip" aria-label="Run mode">{run?.mode ?? 'LIVE_WEB'}</span>
+          <span className="mode-chip" aria-label="Run mode">{run?.mode ?? 'READY'}</span>
           <button
             className={`history-trigger ${vaultOpen ? 'is-active' : ''}`}
             aria-label="Open password vault"
@@ -551,12 +626,12 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
               </div>
             )}
           </div>
-          <button className="demo-badge" aria-expanded={about} onClick={() => setAbout(!about)}><i />Live</button>
+          <button className="demo-badge" aria-expanded={about} onClick={() => setAbout(!about)}><i />{run ? presentation.replaceAll('_', ' ') : 'How it works'}</button>
         </div>
       </header>
       {about && (
         <div className="about">
-          <span>This desk asks the real backend. The right pane shows Steel’s read-only live browser when C connects.</span>
+          <span>Mode and browser status come from the backend. Local demo data is labeled and never presented as a live session.</span>
           <button aria-label="Close note" onClick={() => setAbout(false)}><X size={15} /></button>
         </div>
       )}
@@ -572,12 +647,6 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
                 <span className="welcome-icon"><BookOpen size={22} /></span>
                 <h1>One less thing to figure out.</h1>
                 <p>Course, exam, assignment, or event.<br />Every question first detects the sites, then splits the browser.</p>
-                {features.length > 0 && (
-                  <div className="active-services">
-                    <span>Your campus setup</span>
-                    <div>{features.map((f) => <b key={f}>{f}</b>)}</div>
-                  </div>
-                )}
                 {live.transportError && <p className="transport-error">{live.transportError}</p>}
                 {live.executionUnavailable && <p className="transport-error">The server is up, but live execution is not configured.</p>}
                 <div className="starters">
@@ -593,6 +662,18 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
               <div key={run.id} className="conversation">
                 <div className="user-question">{run.question}</div>
                 <div className="answer-label"><span className="small-logo">a.</span>AllAbout Campus</div>
+                {run.answer && (
+                  <AnswerView
+                    answer={run.answer}
+                    question={run.question}
+                    runId={run.id}
+                    onCite={cite}
+                    onFollowUp={(next) => void start(next, { parentRunId: run.id })}
+                    citationsOpen={citationsOpen}
+                    expanded={expanded}
+                    onToggleCitations={setCitationsOpen}
+                  />
+                )}
                 <section className={`research ${active ? 'is-running' : ''}`}>
                   <button className="section-toggle" onClick={() => setActivityOpen(!activityOpen)} aria-expanded={activityOpen}>
                     <span>
@@ -602,7 +683,7 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
                     <ChevronDown size={15} className={activityOpen ? 'rotated' : ''} />
                   </button>
                   <div className="research-subline">
-                    <span>{run.mode} · {blueprint?.sourceIds.length ?? 0} site{(blueprint?.sourceIds.length ?? 0) === 1 ? '' : 's'}</span>
+                  <span>{run.mode} · {blueprint?.sourceIds.length ?? 0} {(blueprint?.sourceIds.length ?? 0) === 1 ? 'site' : 'sites'}</span>
                     {active && <span>{archPhase}</span>}
                   </div>
                   <ol className="arch-rail" data-phase={archPhase} aria-label="Search architecture">
@@ -624,7 +705,9 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
                       ))}
                     </div>
                   )}
-                  {blueprint && (
+                  {run.answer ? (
+                    <CoverageReceipts answer={run.answer} />
+                  ) : blueprint && (
                     <ul className="coverage-board" aria-label="Site coverage">
                       {coverageForKind(blueprint.kind, blueprint.course).map((site) => {
                         const opened = blueprint.sourceIds.includes(site.id);
@@ -693,28 +776,16 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
                     <button className="retry" onClick={() => void start(run.question)}><RotateCcw size={14} />Try again</button>
                   </div>
                 )}
-                {run.answer && (
-                  <AnswerView
-                    answer={run.answer}
-                    question={run.question}
-                    runId={run.id}
-                    onCite={cite}
-                    onFollowUp={(next) => void start(next, { parentRunId: run.id })}
-                    citationsOpen={citationsOpen}
-                    expanded={expanded}
-                    onToggleCitations={setCitationsOpen}
-                  />
-                )}
               </div>
             )}
           </div>
-          <div className="composer-wrap">
+          <div className={`composer-wrap ${run ? 'has-run' : ''}`}>
             <form onSubmit={(e) => { e.preventDefault(); void start(input); }}>
               <textarea
                 maxLength={2000}
                 aria-label="Ask a question"
                 placeholder="Ask a course, exam, assignment, or event…"
-                rows={2}
+                rows={1}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -725,7 +796,7 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
                 }}
               />
               <div>
-                <span>CSC207H1 <span>·</span> LIVE_WEB</span>
+                <span>{blueprint?.course ?? blueprint?.entity ?? 'Campus'} <span>·</span> {run?.mode ?? (input.toUpperCase().includes('DEMO101') ? 'LOCAL_FIXTURE' : 'LIVE_WEB')}</span>
                 {active ? (
                   <button className="send" type="button" aria-label="Stop task" onClick={() => void live.cancel()}><Square size={14} /></button>
                 ) : (
@@ -733,12 +804,12 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
                 )}
               </div>
             </form>
-            <p>Live pages only. Cited facts stay short; missing facts stay unknown.</p>
+            <p>Execution mode is selected from the question and confirmed by the backend.</p>
           </div>
         </section>
         <section className="browser-panel">
           <div className="panel-header">
-            <span><Monitor size={16} />Steel Live Browser</span>
+            <span><Monitor size={16} />{run?.executionKind === 'local_fixture' ? 'Local Evidence Preview' : 'Steel Browser'}</span>
             <small className={`connection ${connection.online ? 'is-online' : ''}`}><i />{connection.text}</small>
           </div>
           <div className="browser-toolbar">
@@ -747,10 +818,12 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
               <Globe size={13} />
               <span>{latestUrl ? new URL(latestUrl).host : run?.viewerUrl ? 'steel.dev live session' : 'Waiting for a task'}</span>
             </div>
-            <small>{run?.mode ?? 'LIVE'}</small>
+            <small>{run?.mode ?? 'IDLE'}</small>
           </div>
           <div className={`browser-stage ${run ? 'has-live' : ''} ${run && isSteelViewerUrl(run.viewerUrl) && !run.viewerClosed ? 'is-projecting' : run ? 'is-split' : ''}`}>
-            {run ? (
+            {run?.answer ? (
+              <EvidenceWorkspace run={run} selectedEvidenceId={expanded} />
+            ) : run ? (
               isSteelViewerUrl(run.viewerUrl) && !run.viewerClosed ? (
                 <div className="live-frame" data-testid="steel-live-frame">
                   <iframe
@@ -786,8 +859,10 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
                           <b>{pane.title ?? pane.label}</b>
                           <p>
                             {pane.state === 'captured'
-                              ? 'Campus sites block being framed here. The live Steel session is what projects the real page while the run is open.'
-                              : pane.detail ?? (pane.state === 'waiting' ? 'Opening this site next in the Steel session.' : 'This site blocked the live reader or requires login.')}
+                              ? run.executionKind === 'local_fixture'
+                                ? 'Captured from bundled fictional demo data. No browser session was created.'
+                                : 'Captured from the browser run. Open a citation to inspect the supporting quote.'
+                              : pane.detail ?? (pane.state === 'waiting' ? (run.executionKind === 'local_fixture' ? 'Reading bundled demo data.' : 'Waiting for the browser to open this source.') : 'This source could not be read or requires login.')}
                           </p>
                           {quote && <blockquote>{clip(quote, 140)}</blockquote>}
                         </div>
@@ -812,12 +887,12 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
           <div className="page-controls">
             <div className="page-status">
               {active ? <LoaderCircle size={13} className="spin" /> : <Globe size={13} />}
-              <span>{active ? statusText : run?.answer ? 'Live sources reviewed' : 'Your sources will appear here'}</span>
+              <span>{active ? statusText : run?.answer ? `${run.answer.sources.length} source receipt${run.answer.sources.length === 1 ? '' : 's'}` : 'Your sources will appear here'}</span>
             </div>
           </div>
           <div className="browser-footer">
-            <span>{run?.viewerUrl ? (run.viewerClosed ? 'Viewer frozen after cleanup' : 'Read-only Steel session') : 'Waiting for viewer_ready'}</span>
-            <span>Live browsing</span>
+            <span>{viewerDetail(run)}</span>
+            <span>{run?.mode ?? 'IDLE'}</span>
           </div>
         </section>
       </main>
@@ -1009,7 +1084,7 @@ function AuthGate() {
     setFeatures(null);
     setMode('login');
   };
-  if (authenticated && features) return <Workspace features={features} onBack={() => setFeatures(null)} onLogout={logOut} />;
+  if (authenticated && features) return <Workspace />;
   if (authenticated) return <CampusSetup onContinue={setFeatures} onLogout={logOut} />;
   if (entering) {
     return (
@@ -1096,4 +1171,4 @@ function AuthGate() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(<React.StrictMode><AuthGate /></React.StrictMode>);
+createRoot(document.getElementById('root')!).render(<React.StrictMode><Workspace /></React.StrictMode>);

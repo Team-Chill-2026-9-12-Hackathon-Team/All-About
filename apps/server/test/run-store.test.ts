@@ -35,11 +35,15 @@ describe("RunStore", () => {
 
     expect(store.create(input)).toEqual({
       runId: "run-1",
+      mode: "LIVE_WEB",
+      executionKind: "steel_live_web",
       status: "queued",
       answer: null,
       lastSeq: 1,
       cleanup: null,
       viewerUrl: null,
+      viewerState: "unavailable",
+      clarification: null,
     });
 
     const stream = store.openEventStream("run-1", 0, () => undefined);
@@ -111,6 +115,24 @@ describe("RunStore", () => {
     expect(store.getSnapshot("run-1").status).toBe("planning");
     expect(store.getInput("run-1").scope.term).toBe("Fall 2026");
     expect(store.getClarificationAnswer("run-1")).toBe("Fall 2026");
+  });
+
+  it("keeps the pending clarification in the recoverable snapshot", () => {
+    const store = createStore();
+    store.create(input);
+    store.transition("run-1", "planning");
+    store.transition("run-1", "needs_input");
+    store.appendEvent("run-1", "clarification_needed", {
+      question: "Which term?",
+      missingFields: ["term"],
+    });
+
+    expect(store.getSnapshot("run-1").clarification).toEqual({
+      question: "Which term?",
+      missingFields: ["term"],
+    });
+    store.applyClarification("run-1", { term: "Fall 2026" }, "Fall 2026");
+    expect(store.getSnapshot("run-1").clarification).toBeNull();
   });
 
   it("makes cancellation idempotent", () => {

@@ -1,8 +1,11 @@
 import { collectPages as collectWithSteel, type CredentialResolver } from "@allabout/browser";
 import type {
+  BrowserBatch,
+  BrowserEmitter,
   BuildAnswer,
   CollectPages,
   SourceConfig,
+  QueryPlan,
 } from "@allabout/contracts";
 import { buildAnswer as buildWithEvidence } from "@allabout/evidence";
 
@@ -36,10 +39,8 @@ export function createRunRuntime(options: RuntimeOptions): RunRuntime {
   const runStore = options.runStore ?? new RunStore();
   const collectPages =
     options.collectPages ??
-    ((plan, emit, signal) =>
-      shouldCollectFixtures(plan)
-        ? collectFixturePages(plan, emit, signal)
-        : collectWithSteel(plan, emit, signal, options.resolveCredential));
+    createFixtureAwareCollector(runStore, (plan, emit, signal) =>
+      collectWithSteel(plan, emit, signal, options.resolveCredential));
   return {
     sources: options.sources,
     runStore,
@@ -50,6 +51,33 @@ export function createRunRuntime(options: RuntimeOptions): RunRuntime {
       collectPages,
       buildAnswer: options.buildAnswer ?? buildWithEvidence,
     }),
+  };
+}
+
+export function createFixtureAwareCollector(
+  runStore: RunStore,
+  collectLive: (plan: QueryPlan, emit: BrowserEmitter, signal: AbortSignal) => Promise<BrowserBatch>,
+): CollectPages {
+  return async (plan, emit, signal) => {
+      if (shouldCollectFixtures(plan)) return collectFixturePages(plan, emit, signal);
+      if (plan.input.mode !== "LIVE_FIXTURE") {
+        return collectLive(plan, emit, signal);
+      }
+      try {
+        const live = await collectLive(plan, emit, signal);
+        if (live.pages.length > 0) return live;
+      } catch (error) {
+        if (signal.aborted) throw error;
+      }
+      const localPlan = {
+        ...plan,
+        input: {...plan.input, mode: "LOCAL_FIXTURE" as const},
+      };
+      runStore.setMode(plan.runId, "LOCAL_FIXTURE");
+      Object.assign(plan, localPlan);
+      const first = plan.targets[0];
+      if (first) emit({ type: "step", sourceId: first.id, action: "local_fixture_fallback" });
+      return collectFixturePages(localPlan, emit, signal);
   };
 }
 

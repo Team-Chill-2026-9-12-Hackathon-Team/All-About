@@ -25,7 +25,20 @@ Validate every HTTP boundary, C/D adapter result, and persisted event before usi
 - `examples/answer-bundle.json`: D → B → A result.
 - `examples/events.json`: clarification, completed, partial, error, and cancelled event envelopes.
 
-All sample course content is fictional and marked with `LIVE_FIXTURE` / `fixture`. It is not evidence of a real UTSG course or integration.
+All sample course content is fictional and marked with `fixture`. It is not evidence of a real UTSG course or integration.
+
+Execution modes have one meaning each:
+
+| mode | execution | snapshot content | browser cleanup |
+| --- | --- | --- | --- |
+| `LIVE_WEB` | Steel reads real web pages | `live` | must contain a session cleanup receipt |
+| `LIVE_FIXTURE` | Steel reads clearly fictional, network-hosted pages | `fixture` | must contain a session cleanup receipt |
+| `LOCAL_FIXTURE` | the server reads bundled demo data | `fixture` | always `not_created` |
+| `REPLAY` | the server reads a saved capture | `cached` | always `not_created` |
+
+`RunSnapshot` returns `mode`, its derived `executionKind`, and a derived
+`viewerState`. Clients must render these values instead of inferring whether a
+session existed from page content or local history.
 
 ## Contract status
 

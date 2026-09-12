@@ -14,7 +14,7 @@ pnpm install
 pnpm dev
 ```
 
-Vite proxies `/api` to `http://127.0.0.1:3001`.
+Vite runs on the fixed address `http://127.0.0.1:5174` and proxies `/api` to `http://127.0.0.1:3001`. From the repository root, `npm run dev` starts both services and `npm run check:local` verifies the direct backend and the frontend proxy.
 
 ## Checks
 

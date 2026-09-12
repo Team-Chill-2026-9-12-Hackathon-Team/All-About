@@ -37,6 +37,7 @@ test("date parsing preserves offsets and refuses to invent missing context", () 
   assert.deepEqual(parseDateValue("2026-09-25T17:00:00-04:00"), { precision: "instant", iso: "2026-09-25T17:00:00-04:00", timezone: "-04:00" });
   assert.deepEqual(parseDateValue("September 25, 2026 at 5:00 PM EDT"), { precision: "instant", iso: "2026-09-25T17:00:00-04:00", timezone: "EDT" });
   assert.deepEqual(parseDateValue("September 25 at 5:00 PM"), { precision: "unknown", raw: "September 25 at 5:00 PM" });
+  assert.deepEqual(parseDateValue("2026-02-31"), { precision: "unknown", raw: "2026-02-31" });
 });
 
 test("activity fields retain a complete registration URL and citations", async () => {
@@ -117,21 +118,67 @@ test("candidates with invented quotes are rejected", async () => {
   assert.equal(result.evidence.length, 0);
 });
 
-function conflictInput(authority: Evidence["authority"], quote: string) {
+function conflictInput(
+  authority: Evidence["authority"],
+  quote: string,
+  options: { updatePublishedAt?: string; originalPublishedAt?: string; updateKind?: PageSnapshot["kind"]; authorityBasis?: string | null } = {},
+) {
   const claims: Claim[] = [
     { id: "old", field: "deadline", text: "Old", scope: baseScope, nature: "fact", status: "supported", evidenceIds: ["e-old"], dateValue: { precision: "date", date: "2026-09-18", timezone: null } },
     { id: "new", field: "deadline", text: "New", scope: baseScope, nature: "fact", status: "supported", evidenceIds: ["e-new"], dateValue: { precision: "date", date: "2026-09-20", timezone: null } },
   ];
   const evidence: Evidence[] = [
     { id: "e-old", snapshotId: "old-page", quote: "Due September 18.", authority: "institution", authorityBasis: "syllabus" },
-    { id: "e-new", snapshotId: "new-page", quote, authority, authorityBasis: "registry" },
+    { id: "e-new", snapshotId: "new-page", quote, authority, authorityBasis: options.authorityBasis === undefined ? "registry" : options.authorityBasis },
   ];
-  return resolveConflicts(claims, evidence, []);
+  const snapshots = [
+    { ...page("old-page", "old", "Due September 18."), publishedAt: options.originalPublishedAt ?? "2026-09-01T09:00:00-04:00" },
+    { ...page("new-page", "new", quote, baseScope, options.updateKind ?? "official"), publishedAt: options.updatePublishedAt ?? "2026-09-12T09:00:00-04:00" },
+  ];
+  return resolveConflicts(claims, evidence, snapshots);
 }
 
 test("only an explicit instructor update supersedes an earlier date", () => {
   assert.equal(conflictInput("instructor", "The deadline is extended to September 20.").conflicts[0]?.resolution, "explicit_update");
   assert.equal(conflictInput("institution", "The deadline is extended to September 20.").conflicts[0]?.resolution, "unresolved");
+});
+
+test("an older extension cannot supersede a newer syllabus", () => {
+  assert.equal(conflictInput("instructor", "The deadline is extended to September 20.", {
+    updatePublishedAt: "2026-09-01T09:00:00-04:00",
+    originalPublishedAt: "2026-09-15T09:00:00-04:00",
+  }).conflicts[0]?.resolution, "unresolved");
+});
+
+test("network fixture Published lines establish update order", () => {
+  const result = conflictInput("instructor", "The deadline is extended to September 20.");
+  const snapshots = [
+    {...page("old-page", "old", "Published: September 1, 2026 at 9:00 AM EDT\nDue September 18."), publishedAt: null},
+    {...page("new-page", "new", "Published: September 12, 2026 at 10:00 AM EDT\nThe deadline is extended to September 20."), publishedAt: null},
+  ];
+  assert.equal(resolveConflicts(result.claims.map((claim) => ({...claim, status: "supported"})), [
+    {id: "e-old", snapshotId: "old-page", quote: "Due September 18.", authority: "institution", authorityBasis: "syllabus"},
+    {id: "e-new", snapshotId: "new-page", quote: "The deadline is extended to September 20.", authority: "instructor", authorityBasis: "registry"},
+  ], snapshots).conflicts[0]?.resolution, "explicit_update");
+});
+
+test("an unverified instructor label cannot supersede an official date", () => {
+  assert.equal(conflictInput("instructor", "The deadline is extended to September 20.", {
+    updateKind: "course_discussion",
+    authorityBasis: null,
+  }).conflicts[0]?.resolution, "unresolved");
+});
+
+test("deadline extraction ignores a different assignment on the same page", async () => {
+  const assignmentScope = {...baseScope, entity: "Assignment 2"};
+  const result = await buildAnswer(plan(["deadline"], [source("course", assignmentScope)], assignmentScope), {
+    pages: [page("course-page", "course", "Assignment 1 is due September 18, 2026. Assignment 2 is due September 20, 2026.", assignmentScope)],
+    failures: [], cleanup: "released",
+  }, new AbortController().signal);
+  assert.deepEqual(result.claims.filter((claim) => claim.field === "deadline").map((claim) => claim.dateValue), [
+    {precision: "date", date: "2026-09-20", timezone: null},
+  ]);
+  assert.equal(result.conflicts.length, 0);
 });
 
 test("unknown and non-authoritative dates are never confirmed", () => {

@@ -108,4 +108,63 @@ describe("validateAnswerBundle", () => {
       }),
     ).toThrow(/differs from its browser snapshot/);
   });
+
+  it("rejects fixture snapshots masquerading as LIVE_WEB", async () => {
+    const { batch, answer } = await fixture();
+    const livePlan: QueryPlan = {
+      ...plan,
+      input: { ...plan.input, mode: "LIVE_WEB" },
+      targets: plan.targets.map((target) => ({ ...target, contentMode: "live" })),
+    };
+    expect(() =>
+      validateAnswerBundle(livePlan, batch, { ...answer, mode: "LIVE_WEB" }),
+    ).toThrow(/LIVE_WEB snapshot .* must use live content/);
+  });
+
+  it("requires Steel modes to carry a cleanup receipt", async () => {
+    const { batch, answer } = await fixture();
+    expect(() =>
+      validateAnswerBundle(plan, { ...batch, cleanup: "not_created" }, answer),
+    ).toThrow(/LIVE_FIXTURE requires an attempted browser session/);
+  });
+
+  it("allows local fixture answers only when no browser session was created", async () => {
+    const { batch, answer } = await fixture();
+    const localPlan: QueryPlan = {
+      ...plan,
+      input: { ...plan.input, mode: "LOCAL_FIXTURE" },
+    };
+    expect(
+      validateAnswerBundle(
+        localPlan,
+        { ...batch, cleanup: "not_created" },
+        { ...answer, mode: "LOCAL_FIXTURE" },
+      ),
+    ).toMatchObject({ mode: "LOCAL_FIXTURE" });
+    expect(() =>
+      validateAnswerBundle(localPlan, batch, { ...answer, mode: "LOCAL_FIXTURE" }),
+    ).toThrow(/must not claim that a browser session was created/);
+  });
+
+  it("rejects coverage that has no per-source browser receipt", async () => {
+    const { batch, answer } = await fixture();
+    expect(() =>
+      validateAnswerBundle(plan, batch, {
+        ...answer,
+        coverage: [{ ...answer.coverage[0]!, snapshotIds: [] }],
+      }),
+    ).toThrow(/checked coverage .* has no snapshot receipt/);
+  });
+
+  it("rejects an invented claim even when it keeps a real citation", async () => {
+    const { batch, answer } = await fixture();
+    expect(() =>
+      validateAnswerBundle(plan, batch, {
+        ...answer,
+        claims: answer.claims.map((claim, index) => index === 0
+          ? { ...claim, text: "The deadline is January 1, 2099 and late submissions are always accepted." }
+          : claim),
+      }),
+    ).toThrow(/is not grounded in its cited quote/);
+  });
 });

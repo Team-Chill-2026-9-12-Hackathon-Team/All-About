@@ -1,0 +1,65 @@
+{
+  "generatedAt": "2026-09-12T22:22:20.574Z",
+  "question": "When and where is the Labour Day Carillon Recital, who can attend, and what is the Soldiers' Tower carillon?",
+  "passed": true,
+  "consecutivePasses": 3,
+  "results": [
+    {
+      "attempt": 1,
+      "runId": "live-acceptance-1789251634078-1",
+      "passed": true,
+      "elapsedMs": 26844,
+      "mode": "LIVE_WEB",
+      "cleanup": "released",
+      "viewerReady": true,
+      "pageCount": 2,
+      "supportedFactCount": 14,
+      "evidenceCount": 14,
+      "keyDateCount": 1,
+      "contributingSources": [
+        "alumni-carillon-recital",
+        "soldiers-tower-features"
+      ],
+      "failures": [],
+      "consecutivePasses": 1
+    },
+    {
+      "attempt": 2,
+      "runId": "live-acceptance-1789251672927-2",
+      "passed": true,
+      "elapsedMs": 27994,
+      "mode": "LIVE_WEB",
+      "cleanup": "released",
+      "viewerReady": true,
+      "pageCount": 2,
+      "supportedFactCount": 14,
+      "evidenceCount": 14,
+      "keyDateCount": 1,
+      "contributingSources": [
+        "alumni-carillon-recital",
+        "soldiers-tower-features"
+      ],
+      "failures": [],
+      "consecutivePasses": 2
+    },
+    {
+      "attempt": 3,
+      "runId": "live-acceptance-1789251712931-3",
+      "passed": true,
+      "elapsedMs": 27629,
+      "mode": "LIVE_WEB",
+      "cleanup": "released",
+      "viewerReady": true,
+      "pageCount": 2,
+      "supportedFactCount": 14,
+      "evidenceCount": 14,
+      "keyDateCount": 1,
+      "contributingSources": [
+        "alumni-carillon-recital",
+        "soldiers-tower-features"
+      ],
+      "failures": [],
+      "consecutivePasses": 3
+    }
+  ]
+}

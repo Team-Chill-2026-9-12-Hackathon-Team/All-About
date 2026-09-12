@@ -36,7 +36,7 @@ if (!serverConfig.openAiConfigured) {
 }
 if (!serverConfig.steelConfigured) {
   app.log.warn(
-    "STEEL_API_KEY is missing; LIVE_WEB collection will fail, DEMO101 LIVE_FIXTURE still runs locally.",
+    "STEEL_API_KEY is missing; LIVE_WEB and LIVE_FIXTURE collection will fail; DEMO101 LOCAL_FIXTURE remains available.",
   );
 }
 if (credentialVault === undefined) {

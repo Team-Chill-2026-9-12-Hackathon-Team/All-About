@@ -117,11 +117,15 @@ describe("run HTTP API", () => {
     expect(recovered.statusCode).toBe(200);
     expect(recovered.json()).toEqual({
       runId: "run-1",
+      mode: "LIVE_WEB",
+      executionKind: "steel_live_web",
       status: "queued",
       answer: null,
       lastSeq: 1,
       cleanup: null,
       viewerUrl: null,
+      viewerState: "unavailable",
+      clarification: null,
     });
   });
 
@@ -167,6 +171,26 @@ describe("run HTTP API", () => {
       payload: { scopePatch: {}, answer: "Again" },
     });
     expect(repeated.statusCode).toBe(409);
+  });
+
+  it("restores the pending clarification through the snapshot endpoint", async () => {
+    const store = createStore();
+    store.create(input);
+    store.transition("run-1", "planning");
+    store.transition("run-1", "needs_input");
+    store.appendEvent("run-1", "clarification_needed", {
+      question: "Which campus?",
+      missingFields: ["campus"],
+    });
+    const app = buildRouteApp(store);
+    apps.push(app);
+
+    const response = await app.inject({ method: "GET", url: "/api/runs/run-1" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().clarification).toEqual({
+      question: "Which campus?",
+      missingFields: ["campus"],
+    });
   });
 
   it("cancels idempotently and permits a new run", async () => {

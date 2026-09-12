@@ -1,0 +1,21 @@
+{
+  "generatedAt": "2026-09-12T22:50:59.073Z",
+  "elapsedMs": 21785,
+  "mode": "LIVE_FIXTURE",
+  "viewerReady": true,
+  "cleanup": "released",
+  "pageCount": 3,
+  "sourceIds": [
+    "demo101-syllabus",
+    "demo101-announcement",
+    "demo101-student-discussion"
+  ],
+  "fictionalLabelsPresent": true,
+  "deadline": {
+    "precision": "instant",
+    "iso": "2026-09-20T17:00:00-04:00",
+    "timezone": "EDT"
+  },
+  "conflictResolution": "explicit_update",
+  "passed": true
+}

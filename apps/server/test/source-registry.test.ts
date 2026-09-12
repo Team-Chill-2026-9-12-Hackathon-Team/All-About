@@ -16,6 +16,7 @@ describe("live source registry", () => {
       "academic-calendar-csc148",
       "uoft-events",
       "alumni-carillon-recital",
+      "soldiers-tower-features",
       "academic-calendar-sessional-dates",
       "cs-undergrad-courses",
       "reddit-uoft-csc207",

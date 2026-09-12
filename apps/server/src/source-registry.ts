@@ -72,6 +72,23 @@ const candidateSources = [
     access: "public",
   },
   {
+    id: "soldiers-tower-features",
+    kind: "official",
+    label: "U of T Alumni — Features of Soldiers' Tower",
+    entryUrl: "https://alumni.utoronto.ca/community/soldiers-tower/features-of-soldiers-tower",
+    allowedHosts: ["alumni.utoronto.ca"],
+    scope: {
+      school: "University of Toronto",
+      campus: "UTSG",
+      term: null,
+      course: null,
+      section: null,
+      entity: "Labour Day Carillon Recital",
+    },
+    contentMode: "live",
+    access: "public",
+  },
+  {
     id: "academic-calendar-sessional-dates",
     kind: "official",
     label: "A&S Academic Calendar — Sessional Dates",

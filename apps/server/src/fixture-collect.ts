@@ -3,7 +3,7 @@ import { BrowserBatchSchema, type BrowserBatch, type BrowserSignal, type QueryPl
 import { demo101Snapshot } from "./demo101-fixtures.js";
 
 export function shouldCollectFixtures(plan: QueryPlan): boolean {
-  return plan.input.mode === "LIVE_FIXTURE" || plan.targets.every((target) => target.contentMode === "fixture");
+  return plan.input.mode === "LOCAL_FIXTURE";
 }
 
 export async function collectFixturePages(

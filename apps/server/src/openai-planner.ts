@@ -73,7 +73,9 @@ function sourceMatchesScope(source: SourceConfig, input: QueryInput): boolean {
 }
 
 function sourceMatchesMode(source: SourceConfig, input: QueryInput): boolean {
-  if (input.mode === "LIVE_FIXTURE") return source.contentMode === "fixture";
+  if (input.mode === "LIVE_FIXTURE" || input.mode === "LOCAL_FIXTURE") {
+    return source.contentMode === "fixture";
+  }
   if (input.mode === "REPLAY") return source.contentMode === "cached";
   return source.contentMode !== "fixture";
 }

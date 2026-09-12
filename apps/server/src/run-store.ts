@@ -1,6 +1,8 @@
 import {
   AnswerBundleSchema,
   EventEnvelopeSchema,
+  executionKindForMode,
+  viewerStateFor,
   type AnswerBundle,
   type CleanupState,
   type EventEnvelope,
@@ -136,13 +138,23 @@ export class RunStore {
 
   getSnapshot(runId: string): RunSnapshot {
     const record = this.#require(runId);
+    const viewerUrl = liveViewerUrl(record);
+    const clarificationEvent = record.status === "needs_input"
+      ? [...record.events].reverse().find((event) => event.type === "clarification_needed")
+      : undefined;
     return {
       runId: record.runId,
+      mode: record.input.mode,
+      executionKind: executionKindForMode(record.input.mode),
       status: record.status,
       answer: record.answer === null ? null : structuredClone(record.answer),
       lastSeq: record.events.length,
       cleanup: record.cleanup,
-      viewerUrl: liveViewerUrl(record),
+      viewerUrl,
+      viewerState: viewerStateFor(viewerUrl, record.cleanup),
+      clarification: clarificationEvent?.type === "clarification_needed"
+        ? structuredClone(clarificationEvent.payload)
+        : null,
     };
   }
 
@@ -180,6 +192,17 @@ export class RunStore {
     return this.getSnapshot(runId);
   }
 
+  setMode(runId: string, mode: QueryInput["mode"]): RunSnapshot {
+    const record = this.#require(runId);
+    record.input.mode = mode;
+    this.#append(record, "execution_changed", {
+      mode,
+      executionKind: executionKindForMode(mode),
+      reason: "live_fixture_unavailable",
+    });
+    return this.getSnapshot(runId);
+  }
+
   applyClarification(
     runId: string,
     scopePatch: Partial<Scope>,
@@ -205,7 +228,11 @@ export class RunStore {
     if (record.status !== "cancelling") {
       this.transition(runId, "cancelling");
     }
-    return this.transition(runId, "cancelled");
+    const snapshot = this.transition(runId, "cancelled");
+    if (record.cleanup === null && !record.events.some((event) => event.type === "viewer_ready")) {
+      record.cleanup = "not_created";
+    }
+    return { ...snapshot, cleanup: record.cleanup };
   }
 
   appendEvent<TType extends Exclude<EventType, "run_status" | "answer_ready">>(

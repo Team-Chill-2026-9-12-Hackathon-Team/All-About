@@ -257,13 +257,15 @@ describe("RunExecutor", () => {
     executor.start("run-1");
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(store.getSnapshot("run-1").status).toBe("browsing");
-    executor.cancel("run-1");
+    const cancellation = executor.cancel("run-1");
     expect(receivedSignal?.aborted).toBe(true);
     release();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    const cancelled = await cancellation;
 
     const snapshot = store.getSnapshot("run-1");
+    expect(cancelled.cleanup).toBe("released");
     expect(snapshot.status).toBe("cancelled");
+    expect(snapshot.cleanup).toBe("released");
     expect(snapshot.answer).toBeNull();
   });
 
