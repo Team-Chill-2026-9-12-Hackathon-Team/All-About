@@ -380,7 +380,7 @@ function CoverageReceipts({answer}: {answer: AnswerBundle}) {
   );
 }
 
-function Workspace() {
+function Workspace({onReturnToLanding}: {onReturnToLanding?: () => void} = {}) {
   const [input, setInput] = useState('');
   const [history, setHistory] = useState(readHistory);
   const [prefs, setPrefs] = useState(readPreferences);
@@ -539,6 +539,11 @@ function Workspace() {
     setClarifyText('');
   };
 
+  const returnToLanding = async () => {
+    await reset();
+    onReturnToLanding?.();
+  };
+
   const cite = (id: string) => {
     setExpanded(id);
     setCitationsOpen(true);
@@ -580,7 +585,7 @@ function Workspace() {
       <div className="landscape" aria-hidden="true" />
       <div className="background-wordmark" aria-hidden="true">ALLABOUT CAMPUS</div>
       <header className="app-header">
-        <button className="brand brand-button" aria-label="Start a new task" onClick={() => void reset()}>
+        <button className="brand brand-button" aria-label="Return to sign in" onClick={() => void returnToLanding()}>
           <span className="logo">a.</span>
           <strong>AllAbout <span>Campus</span></strong>
         </button>
@@ -1030,14 +1035,20 @@ function readRememberedSession(): boolean {
   }
 }
 
-function AuthGate() {
+type AuthGateProps = {
+  forceLogin?: boolean;
+  onEnterDesk?: () => void;
+  onReturnToLanding?: () => void;
+};
+
+function AuthGate({forceLogin = false, onEnterDesk, onReturnToLanding}: AuthGateProps = {}) {
   const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [method, setMethod] = useState<'email' | 'phone'>('email');
   const [loading, setLoading] = useState(false);
   const [entering, setEntering] = useState(false);
   const [keepSignedIn, setKeepSignedIn] = useState(true);
-  const [authenticated, setAuthenticated] = useState(readRememberedSession);
+  const [authenticated, setAuthenticated] = useState(() => !forceLogin && readRememberedSession());
   const [features, setFeatures] = useState<string[] | null>(null);
   const [notice, setNotice] = useState('');
   const enter = (remember = keepSignedIn) => {
@@ -1084,8 +1095,8 @@ function AuthGate() {
     setFeatures(null);
     setMode('login');
   };
-  if (authenticated && features) return <Workspace />;
-  if (authenticated) return <CampusSetup onContinue={setFeatures} onLogout={logOut} />;
+  if (authenticated && features) return <Workspace onReturnToLanding={onReturnToLanding} />;
+  if (authenticated) return <CampusSetup onContinue={(selected) => { setFeatures(selected); onEnterDesk?.(); }} onLogout={logOut} />;
   if (entering) {
     return (
       <div className="launch-screen" aria-label="Entering AllAbout Campus">
@@ -1171,4 +1182,12 @@ function AuthGate() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(<React.StrictMode><Workspace /></React.StrictMode>);
+function App() {
+  const [showLanding, setShowLanding] = useState(false);
+  if (showLanding) {
+    return <AuthGate forceLogin onEnterDesk={() => setShowLanding(false)} onReturnToLanding={() => setShowLanding(true)} />;
+  }
+  return <Workspace onReturnToLanding={() => setShowLanding(true)} />;
+}
+
+createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);
