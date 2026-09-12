@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "smoke": "tsx src/smoke.ts",
     "smoke:collect": "tsx src/events-smoke.ts",
+    "smoke:calendar": "tsx src/calendar-smoke.ts",
     "smoke:cancel": "tsx src/cancel-smoke.ts",
     "smoke:viewer": "tsx src/viewer-smoke.ts",
     "smoke:timeout": "tsx src/timeout-smoke.ts",

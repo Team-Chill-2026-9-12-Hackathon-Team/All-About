@@ -32,11 +32,11 @@ try {
   const remoteContext = remoteBrowser.contexts()[0];
   if (!remoteContext) throw new Error('Missing Steel default browser context.');
   const remotePage = remoteContext.pages()[0] ?? (await remoteContext.newPage());
-  await remotePage.goto('https://www.utoronto.ca/events', {
+  await remotePage.goto('https://artsci.calendar.utoronto.ca/course/csc207h1', {
     waitUntil: 'domcontentloaded',
     timeout: 20_000,
   });
-  await remotePage.getByText('Xplore Hart House', { exact: false }).first().waitFor({ timeout: 10_000 });
+  await remotePage.getByText('CSC207H1', { exact: false }).first().waitFor({ timeout: 10_000 });
 
   const viewerUrl = new URL(session.debugUrl);
   viewerUrl.searchParams.set('interactive', 'false');
