@@ -63,6 +63,18 @@ describe("encrypted credential vault", () => {
     });
   });
 
+  it("preserves intentional whitespace in passwords", async () => {
+    const { vault } = await createVault();
+    await vault.create({
+      domain: "piazza.com",
+      username: "student@example.edu",
+      password: " leading-and-trailing ",
+    });
+    await expect(vault.resolve("piazza.com")).resolves.toMatchObject({
+      password: " leading-and-trailing ",
+    });
+  });
+
   it("never returns a password from HTTP metadata endpoints", async () => {
     const { vault } = await createVault();
     const app = buildApp({}, { credentialVault: vault });
