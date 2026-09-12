@@ -1,16 +1,8 @@
-import type {
-  AnswerBlock,
-  AnswerBundle,
-  BrowserBatch,
-  Claim,
-  Evidence,
-  QueryPlan,
-} from "@allabout/contracts";
-
-import { RuleBasedExtractor } from "./extract/rule-based-extractor.js";
-import type { CandidateExtractor } from "./extract/types.js";
-import { resolveConflicts } from "./conflicts/resolve-conflicts.js";
-import { quoteExists } from "./text.js";
+import { RuleBasedExtractor } from "./extract/rule-based-extractor.ts";
+import type { CandidateExtractor } from "./extract/types.ts";
+import { resolveConflicts } from "./conflicts/resolve-conflicts.ts";
+import { quoteExists } from "./text.ts";
+import type { AnswerBlock, AnswerBundle, BrowserBatch, Claim, Evidence, QueryPlan } from "./types.ts";
 
 const MONTHS: Record<string, string> = {
   january: "01", february: "02", march: "03", april: "04",
@@ -19,17 +11,15 @@ const MONTHS: Record<string, string> = {
 };
 
 function parseDate(raw: string): Claim["dateValue"] {
+  const instant = raw.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})$/);
+  if (instant) return { precision: "instant", iso: new Date(raw).toISOString(), timezone: raw.slice(-6) };
   const match = raw.match(/([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})/);
   if (!match) return { precision: "unknown", raw };
-  const [, monthName, day, year] = match;
-  if (monthName === undefined || day === undefined || year === undefined) {
-    return { precision: "unknown", raw };
-  }
-  const month = MONTHS[monthName.toLowerCase()];
+  const month = MONTHS[match[1].toLowerCase()];
   if (!month) return { precision: "unknown", raw };
   return {
     precision: "date",
-    date: `${year}-${month}-${day.padStart(2, "0")}`,
+    date: `${match[3]}-${month}-${match[2].padStart(2, "0")}`,
     timezone: null,
   };
 }
@@ -47,6 +37,7 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
 
     const claims: Claim[] = [];
     const evidence: Evidence[] = [];
+    const claimByKey = new Map<string, Claim>();
     for (const candidate of candidates) {
       const snapshot = snapshots.get(candidate.snapshotId);
       if (!snapshot || !quoteExists(candidate.quote, snapshot.text)) continue;
@@ -58,7 +49,15 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
         authority: candidate.authority,
         authorityBasis: candidate.authorityBasis,
       };
-      claims.push({
+      evidence.push(evidenceItem);
+      const dateValue = candidate.dateRaw ? parseDate(candidate.dateRaw) : undefined;
+      const key = JSON.stringify([candidate.field, candidate.text.trim().replace(/\s+/g, " "), snapshot.scope, dateValue]);
+      const existing = claimByKey.get(key);
+      if (existing) {
+        existing.evidenceIds.push(evidenceItem.id);
+        continue;
+      }
+      const claim: Claim = {
         id: `claim-${claims.length + 1}`,
         field: candidate.field,
         text: candidate.text,
@@ -66,9 +65,10 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
         nature: candidate.nature,
         status: "supported",
         evidenceIds: [evidenceItem.id],
-        ...(candidate.dateRaw ? { dateValue: parseDate(candidate.dateRaw) } : {}),
-      });
-      evidence.push(evidenceItem);
+        ...(dateValue ? { dateValue } : {}),
+      };
+      claimByKey.set(key, claim);
+      claims.push(claim);
     }
 
     const failures = new Map(batch.failures.map((item) => [item.sourceId, item]));
@@ -84,28 +84,21 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
     });
 
     const resolved = resolveConflicts(claims, evidence, batch.pages);
-    const toBlock = (claim: Claim): AnswerBlock => ({
-      text: claim.text,
-      claimIds: [claim.id],
-      evidenceIds: claim.evidenceIds,
-    });
-    const supportedClaims = resolved.claims.filter(
-      (claim) => claim.status === "supported",
-    );
+    const block = (claim: Claim): AnswerBlock => ({ text: claim.text, claimIds: [claim.id], evidenceIds: claim.evidenceIds });
+    const supported = resolved.claims.filter((claim) => claim.status === "supported");
+    const summary = supported.filter((claim) => ["deadline", "location", "eligibility", "event_date", "organizer", "event_description"].includes(claim.field)).map(block);
+    const requirements = supported.filter((claim) => ["submission_format", "requirements"].includes(claim.field)).map(block);
+    const communityNotes = supported.filter((claim) => claim.nature === "opinion" || claim.field === "community_note").map(block);
     return {
       schemaVersion: "1",
       runId: plan.runId,
-      mode: plan.input.mode,
-      scope: plan.input.scope,
-      summary: supportedClaims
-        .filter((claim) => claim.nature === "fact" && claim.field !== "submission_format")
-        .map(toBlock),
-      requirements: supportedClaims
-        .filter((claim) => claim.nature === "fact" && claim.field === "submission_format")
-        .map(toBlock),
-      communityNotes: supportedClaims
-        .filter((claim) => claim.nature === "opinion")
-        .map(toBlock),
+      mode: plan.input?.mode ?? "LIVE_FIXTURE",
+      scope: plan.input?.scope ?? supported[0]?.scope ?? batch.pages[0]?.scope ?? {
+        school: null, campus: null, term: null, course: null, section: null, entity: null,
+      },
+      summary,
+      requirements,
+      communityNotes,
       unknowns: resolved.claims.length === 0
         ? ["No supported facts were found in the checked pages."]
         : resolved.conflicts.some((item) => item.resolution === "unresolved")

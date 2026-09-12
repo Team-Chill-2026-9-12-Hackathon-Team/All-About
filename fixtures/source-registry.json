@@ -1,0 +1,32 @@
+[
+  {
+    "id": "uoft-academic-calendar-csc207",
+    "kind": "official",
+    "label": "Academic Calendar CSC207",
+    "entryUrl": "https://artsci.calendar.utoronto.ca/course/csc207h1",
+    "allowedHosts": ["artsci.calendar.utoronto.ca"],
+    "contentMode": "live",
+    "access": "public",
+    "suggestedAuthority": "institution"
+  },
+  {
+    "id": "demo101-instructor",
+    "kind": "official",
+    "label": "DEMO101 instructor announcement",
+    "entryUrl": "https://example.com/demo101/announcement",
+    "allowedHosts": ["example.com"],
+    "contentMode": "fixture",
+    "access": "public",
+    "suggestedAuthority": "instructor"
+  },
+  {
+    "id": "demo101-student-discussion",
+    "kind": "course_discussion",
+    "label": "DEMO101 student discussion",
+    "entryUrl": "https://example.com/demo101/discussion",
+    "allowedHosts": ["example.com"],
+    "contentMode": "fixture",
+    "access": "public",
+    "suggestedAuthority": "student"
+  }
+]

@@ -7,6 +7,8 @@ Minimal standalone D-module scaffold. It currently demonstrates:
 - a basic date-only deadline extraction
 - a replaceable `CandidateExtractor` interface for future model integration
 - submission-format extraction
+- club activity fields: event date, location, registration link, organizer, description
+- exact duplicate claims are merged while retaining all supporting sources
 - explicit deadline-update and unresolved-conflict handling
 - confirmed vs. needs-confirmation key dates
 - source coverage reporting
