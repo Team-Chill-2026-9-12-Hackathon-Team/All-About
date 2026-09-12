@@ -57,7 +57,7 @@ export function registerCredentialRoutes(
       const credential = await vault.create(parsed.data);
       return reply.code(201).send({ credential });
     } catch (error) {
-      return invalid(reply, error instanceof Error ? error.message : undefined);
+      return invalid(reply, publicCredentialError(error));
     }
   });
 
@@ -81,8 +81,20 @@ export function registerCredentialRoutes(
             error: { code: "CREDENTIAL_NOT_FOUND", message: "Credential not found." },
           });
         }
-        return invalid(reply, error instanceof Error ? error.message : undefined);
+        return invalid(reply, publicCredentialError(error));
       }
     },
   );
+}
+
+function publicCredentialError(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  const safeMessages = new Set([
+    "A credential already exists for this domain.",
+    "Domain must be a hostname without a protocol, path, or port.",
+    "Domain must be a valid fully qualified hostname.",
+    "Username is required.",
+    "Password is required.",
+  ]);
+  return safeMessages.has(message) ? message : "Credential could not be saved.";
 }
