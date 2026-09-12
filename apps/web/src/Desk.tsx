@@ -3,7 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {
   AlarmClock, ArrowRight, ArrowUp, ArrowUpRight, BellRing, BookOpen, CalendarDays, Check, ChevronDown,
   Eye, EyeOff, Globe, GraduationCap, History, LayoutGrid, LoaderCircle, Mail, MessageSquare, Monitor, Smartphone,
-  Plus, RotateCcw, Search, SlidersHorizontal, Square, Trash2, Upload, X,
+  KeyRound, Plus, RotateCcw, Search, SlidersHorizontal, Square, Trash2, Upload, X,
 } from 'lucide-react';
 import {HISTORY_KEY, SETTINGS_KEY, readHistory, readPreferences, type HistoryItem, type Preferences} from './history';
 import {
@@ -12,6 +12,7 @@ import {
 } from './live';
 import { coverageForKind, coverageSite } from './coverage-catalog.ts';
 import { SEARCH_PHASES, searchPhase, type SearchPhase } from './search-architecture.ts';
+import { addVaultEntry, listVaultEntries, removeVaultEntry, type VaultPublicEntry } from './vault.ts';
 import './desk.css';
 
 const starterQuestions = [
@@ -263,6 +264,12 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
   const [storageError, setStorageError] = useState(false);
   const [clarifyText, setClarifyText] = useState('');
   const [archPhase, setArchPhase] = useState<SearchPhase>('detect');
+  const [vaultOpen, setVaultOpen] = useState(false);
+  const [vaultEntries, setVaultEntries] = useState<VaultPublicEntry[]>([]);
+  const [vaultHost, setVaultHost] = useState('piazza.com');
+  const [vaultUser, setVaultUser] = useState('');
+  const [vaultPassword, setVaultPassword] = useState('');
+  const [vaultError, setVaultError] = useState('');
   const feed = useRef<HTMLDivElement>(null);
   const chat = useRef<HTMLDivElement>(null);
   const dialog = useRef<HTMLElement>(null);
@@ -302,6 +309,9 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
   useEffect(() => {
     if (run && run.id !== 'detecting') persist(run);
   }, [run?.id, run?.status]);
+  useEffect(() => {
+    void listVaultEntries().then(setVaultEntries).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (!run) {
@@ -450,6 +460,19 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
           <button className="tools-back" onClick={onBack}><LayoutGrid size={16} />My tools</button>
           <span className="term">U of T · Fall 2026</span>
           <span className="mode-chip" aria-label="Run mode">{run?.mode ?? 'LIVE_WEB'}</span>
+          <button
+            className={`history-trigger ${vaultOpen ? 'is-active' : ''}`}
+            aria-expanded={vaultOpen}
+            onClick={() => {
+              setVaultOpen(true);
+              setSettings(false);
+              void listVaultEntries().then(setVaultEntries).catch((error: unknown) => {
+                setVaultError(error instanceof Error ? error.message : 'Keychain unavailable.');
+              });
+            }}
+          >
+            <KeyRound size={16} />Keychain{vaultEntries.length > 0 && <span className="count">{vaultEntries.length}</span>}
+          </button>
           <button
             className={`history-trigger ${drawer ? 'is-active' : ''}`}
             ref={historyButton}
@@ -785,6 +808,62 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
             <div className="history-bottom">
               <span>{storageError ? 'Storage unavailable — kept for this session only.' : 'Saved on this browser · up to 40 inquiries'}</span>
               <small>History never pretends to replay Steel.</small>
+            </div>
+          </aside>
+        </div>
+      )}
+      {vaultOpen && (
+        <div className="drawer-backdrop" onClick={() => setVaultOpen(false)}>
+          <aside className="history-drawer" role="dialog" aria-modal="true" aria-labelledby="vault-heading" onClick={(e) => e.stopPropagation()}>
+            <div className="drawer-heading">
+              <div><KeyRound size={18} /><h2 id="vault-heading">Keychain</h2></div>
+              <button className="icon-button" aria-label="Close keychain" onClick={() => setVaultOpen(false)}><X size={18} /></button>
+            </div>
+            <p className="history-description">Save your own campus logins by hostname. The agent only uses them on that host, never puts passwords in the answer, and never invents a session.</p>
+            <form
+              className="clarify-box"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void addVaultEntry({ host: vaultHost, username: vaultUser, password: vaultPassword })
+                  .then((entry) => {
+                    setVaultEntries((rows) => [...rows.filter((row) => row.host !== entry.host || row.username !== entry.username), entry]);
+                    setVaultPassword('');
+                    setVaultError('');
+                  })
+                  .catch((error: unknown) => {
+                    setVaultError(error instanceof Error ? error.message : 'Could not save.');
+                  });
+              }}
+            >
+              <input value={vaultHost} onChange={(e) => setVaultHost(e.target.value)} placeholder="piazza.com" aria-label="Site host" required />
+              <input value={vaultUser} onChange={(e) => setVaultUser(e.target.value)} placeholder="Username or email" aria-label="Username" required />
+              <input value={vaultPassword} onChange={(e) => setVaultPassword(e.target.value)} type="password" placeholder="Password" aria-label="Password" required />
+              <button type="submit" className="retry">Save to keychain</button>
+            </form>
+            {vaultError && <p className="transport-error">{vaultError}</p>}
+            <div className="history-list">
+              {vaultEntries.length === 0 ? (
+                <div className="history-empty">
+                  <KeyRound size={25} />
+                  <h3>No campus logins yet.</h3>
+                  <p>Add Piazza, Quercus, or ACORN with the exact hostname.</p>
+                </div>
+              ) : vaultEntries.map((entry) => (
+                <div className="history-item" key={entry.id}>
+                  <span className="history-open">
+                    <KeyRound size={15} />
+                    <span>
+                      {entry.label}
+                      <small>{entry.host} · {entry.username}</small>
+                    </span>
+                  </span>
+                  <button className="delete-history" aria-label={`Remove ${entry.host}`} onClick={() => {
+                    void removeVaultEntry(entry.id).then(() => {
+                      setVaultEntries((rows) => rows.filter((row) => row.id !== entry.id));
+                    });
+                  }}><Trash2 size={14} /></button>
+                </div>
+              ))}
             </div>
           </aside>
         </div>

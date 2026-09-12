@@ -1,11 +1,20 @@
+import { fileURLToPath } from "node:url";
+
 import { buildApp } from "./app.js";
 import { loadRootEnvironment, readServerConfig } from "./config.js";
 import { createRunRuntime } from "./runtime.js";
 import { liveSourceRegistry } from "./source-registry.js";
+import { VaultStore } from "./vault-store.js";
 
 loadRootEnvironment();
 
 const serverConfig = readServerConfig();
+const vaultStore = new VaultStore({
+  filePath:
+    process.env.VAULT_FILE ??
+    fileURLToPath(new URL("../../../.data/vault.enc", import.meta.url)),
+  masterKey: process.env.VAULT_MASTER_KEY ?? "allabout-dev-vault-key",
+});
 const runtime =
   serverConfig.openAiApiKey !== undefined &&
   serverConfig.openAiModel !== undefined &&
@@ -14,12 +23,13 @@ const runtime =
         sources: liveSourceRegistry,
         apiKey: serverConfig.openAiApiKey,
         model: serverConfig.openAiModel,
+        vaultStore,
       })
     : undefined;
 const app =
   runtime === undefined
-    ? buildApp({ logger: true }, { sources: liveSourceRegistry })
-    : buildApp({ logger: true }, runtime);
+    ? buildApp({ logger: true }, { sources: liveSourceRegistry, vaultStore })
+    : buildApp({ logger: true }, { ...runtime, vaultStore });
 
 if (!serverConfig.openAiConfigured) {
   app.log.warn(

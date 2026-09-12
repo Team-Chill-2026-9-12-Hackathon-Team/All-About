@@ -3,12 +3,21 @@ import { chromium, type Browser, type Page } from 'playwright';
 import { BrowserBatchSchema, QueryPlanSchema } from '@allabout/contracts';
 import { fallbackUrlFor, shouldUseFallback } from './fallbacks.js';
 import {
+  credentialForHost,
+  fillLoginForm,
+  pageHasLoginForm,
+  type SiteCredential,
+} from './login.js';
+import {
   assertAllowedUrl,
   looksBlocked,
   looksLikeAuthentication,
   readLinks,
   readVisibleText,
 } from './page-tools.js';
+
+export type { SiteCredential } from './login.js';
+export { credentialForHost, fillLoginForm, hostsMatch, pageHasLoginForm } from './login.js';
 import type {
   BrowserBatch,
   BrowserSignal,
@@ -28,6 +37,7 @@ export async function collectPages(
   plan: QueryPlan,
   emit: (signal: BrowserSignal) => void,
   signal: AbortSignal,
+  options: { credentials?: SiteCredential[] } = {},
 ): Promise<BrowserBatch> {
   QueryPlanSchema.parse(plan);
   validatePlan(plan);
@@ -111,7 +121,7 @@ export async function collectPages(
         try {
           await collectTarget(page, activeTarget, plan, combinedSignal, emit, () => {
             stepCount += 1;
-          }, pages);
+          }, pages, options.credentials ?? []);
           finalFailure = null;
           break;
         } catch (error) {
@@ -189,13 +199,12 @@ async function collectTarget(
   emit: (signal: BrowserSignal) => void,
   countStep: () => void,
   pages: PageSnapshot[],
+  credentials: SiteCredential[],
 ): Promise<void> {
-  if (target.access !== 'public') {
+  if (target.access === 'unconfigured') {
     throw new BrowserTargetError(
-      target.access === 'authorized' ? 'AUTH_REQUIRED' : 'UNSUPPORTED_SOURCE',
-      target.access === 'authorized'
-        ? 'This source requires a separately authorized browser session.'
-        : 'This source has not been configured for browser access.',
+      'UNSUPPORTED_SOURCE',
+      'This source has not been configured for browser access.',
       false,
     );
   }
@@ -230,21 +239,42 @@ async function collectTarget(
   if (looksBlocked(status, title, body)) {
     throw new BrowserTargetError('ACCESS_BLOCKED', 'The source returned an access check or block page.', true);
   }
-  if (looksLikeAuthentication(status, finalUrl.href)) {
-    emit({ type: 'step', sourceId: target.id, action: 'hold_for_viewer', url: finalUrl.href });
-    try {
-      await holdForViewer(2_000, signal);
-    } catch {
-      /* still report the login wall */
+  let capturedUrl = finalUrl;
+  let signedIn = false;
+  const credential = credentialForHost(credentials, finalUrl.host);
+  const loginForm = await pageHasLoginForm(page);
+  if (looksLikeAuthentication(status, finalUrl.href) || loginForm) {
+    if (credential) {
+      countStep();
+      emit({ type: 'step', sourceId: target.id, action: 'sign_in', url: finalUrl.href });
+      const filled = await fillLoginForm(page, credential, signal);
+      throwIfAborted(signal);
+      if (filled) {
+        await page.locator('body').waitFor({ timeout: 5_000 }).catch(() => undefined);
+      }
+      const afterUrl = new URL(page.url());
+      const stillLogin = looksLikeAuthentication(null, afterUrl.href) || (await pageHasLoginForm(page));
+      if (stillLogin) {
+        throw new BrowserTargetError('AUTH_REQUIRED', 'The keychain sign-in did not leave the login page.', false);
+      }
+      capturedUrl = assertAllowedUrl(afterUrl.href, target.allowedHosts);
+      signedIn = true;
+    } else if (looksLikeAuthentication(status, finalUrl.href)) {
+      emit({ type: 'step', sourceId: target.id, action: 'hold_for_viewer', url: finalUrl.href });
+      try {
+        await holdForViewer(2_000, signal);
+      } catch {
+        /* still report the login wall */
+      }
+      throw new BrowserTargetError('AUTH_REQUIRED', 'The source redirected to an authentication page.', false);
     }
-    throw new BrowserTargetError('AUTH_REQUIRED', 'The source redirected to an authentication page.', false);
   }
-  if (status !== null && status >= 400) {
+  if (!signedIn && status !== null && status >= 400) {
     throw new BrowserTargetError('NAVIGATION_FAILED', `The source returned HTTP ${status}.`, status >= 500);
   }
 
   countStep();
-  emit({ type: 'step', sourceId: target.id, action: 'read_visible_text', url: finalUrl.href });
+  emit({ type: 'step', sourceId: target.id, action: 'read_visible_text', url: capturedUrl.href });
   const read = await readVisibleText(page);
   if (read.text.length < MIN_TEXT_LENGTH) {
     throw new BrowserTargetError('NO_MATCH', 'The page did not expose enough visible text to use.', true);
@@ -260,7 +290,7 @@ async function collectTarget(
   const snapshot: PageSnapshot = {
     id: `${plan.runId}:${target.id}:${pages.length + 1}`,
     sourceId: target.id,
-    url: finalUrl.href,
+    url: capturedUrl.href,
     title: read.title,
     text,
     fetchedAt: new Date().toISOString(),

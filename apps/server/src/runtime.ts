@@ -9,6 +9,7 @@ import { buildAnswer as buildWithEvidence } from "@allabout/evidence";
 import { createOpenAiRunPlanner } from "./openai-planner.js";
 import { createDefaultPlan, RunExecutor, type RunPlanner } from "./run-executor.js";
 import { RunStore } from "./run-store.js";
+import type { VaultStore } from "./vault-store.js";
 
 export interface RuntimeOptions {
   sources: SourceConfig[];
@@ -18,12 +19,14 @@ export interface RuntimeOptions {
   planRun?: RunPlanner;
   collectPages?: CollectPages;
   buildAnswer?: BuildAnswer;
+  vaultStore?: VaultStore;
 }
 
 export interface RunRuntime {
   sources: SourceConfig[];
   runStore: RunStore;
   runExecutor: RunExecutor;
+  vaultStore?: VaultStore;
 }
 
 export function createRunRuntime(options: RuntimeOptions): RunRuntime {
@@ -32,14 +35,23 @@ export function createRunRuntime(options: RuntimeOptions): RunRuntime {
   }
   const planRun = options.planRun ?? createConfiguredOpenAiPlanner(options);
   const runStore = options.runStore ?? new RunStore();
+  const collectPages =
+    options.collectPages ??
+    ((plan, emit, signal) =>
+      collectWithSteel(plan, emit, signal, {
+        credentials: options.vaultStore?.secretsForHosts(
+          plan.targets.flatMap((target) => target.allowedHosts),
+        ) ?? [],
+      }));
   return {
     sources: options.sources,
     runStore,
+    ...(options.vaultStore ? { vaultStore: options.vaultStore } : {}),
     runExecutor: new RunExecutor({
       runStore,
       sources: options.sources,
       planRun,
-      collectPages: options.collectPages ?? collectWithSteel,
+      collectPages,
       buildAnswer: options.buildAnswer ?? buildWithEvidence,
     }),
   };

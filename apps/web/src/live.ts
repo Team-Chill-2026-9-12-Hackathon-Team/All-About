@@ -290,6 +290,7 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
             detect_sites: 'Detected sites for this question',
             split_panes: 'Opened the split view',
             fallback_source: 'Opened a public fallback',
+            sign_in: 'Signing in with the keychain',
             navigate: 'Opening the live page',
             read_visible_text: 'Reading visible text',
             hold_for_viewer: 'Holding the live browser so you can see it',
