@@ -95,7 +95,7 @@ export class FileCredentialVault implements CredentialVault {
         domain,
         secret: this.encrypt(id, domain, {
           username: requireValue(input.username, "Username"),
-          password: requireValue(input.password, "Password"),
+          password: requireSecret(input.password, "Password"),
         }),
         createdAt: now,
         updatedAt: now,
@@ -118,7 +118,7 @@ export class FileCredentialVault implements CredentialVault {
       record.updatedAt = new Date().toISOString();
       record.secret = this.encrypt(record.id, domain, {
         username: requireValue(input.username, "Username"),
-        password: input.password === undefined ? current.password : requireValue(input.password, "Password"),
+        password: input.password === undefined ? current.password : requireSecret(input.password, "Password"),
       });
       return this.toMetadata(record);
     });
@@ -186,7 +186,7 @@ export class FileCredentialVault implements CredentialVault {
     const value = JSON.parse(cleartext.toString("utf8")) as Partial<SecretPayload>;
     return {
       username: requireValue(value.username, "Stored username"),
-      password: requireValue(value.password, "Stored password"),
+      password: requireSecret(value.password, "Stored password"),
     };
   }
 
@@ -244,6 +244,11 @@ function requireValue(value: string | undefined, label: string): string {
   const normalized = value?.trim();
   if (!normalized) throw new Error(`${label} is required.`);
   return normalized;
+}
+
+function requireSecret(value: string | undefined, label: string): string {
+  if (value === undefined || value.length === 0) throw new Error(`${label} is required.`);
+  return value;
 }
 
 function isMissingFile(error: unknown): boolean {
