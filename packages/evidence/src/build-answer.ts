@@ -2,7 +2,7 @@ import { RuleBasedExtractor } from "./extract/rule-based-extractor.ts";
 import type { CandidateExtractor } from "./extract/types.ts";
 import { resolveConflicts } from "./conflicts/resolve-conflicts.ts";
 import { quoteExists } from "./text.ts";
-import type { AnswerBundle, BrowserBatch, Claim, Evidence, QueryPlan } from "./types.ts";
+import type { AnswerBlock, AnswerBundle, BrowserBatch, Claim, Evidence, QueryPlan } from "./types.ts";
 
 const MONTHS: Record<string, string> = {
   january: "01", february: "02", march: "03", april: "04",
@@ -11,6 +11,8 @@ const MONTHS: Record<string, string> = {
 };
 
 function parseDate(raw: string): Claim["dateValue"] {
+  const instant = raw.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})$/);
+  if (instant) return { precision: "instant", iso: new Date(raw).toISOString(), timezone: raw.slice(-6) };
   const match = raw.match(/([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})/);
   if (!match) return { precision: "unknown", raw };
   const month = MONTHS[match[1].toLowerCase()];
@@ -82,16 +84,21 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
     });
 
     const resolved = resolveConflicts(claims, evidence, batch.pages);
+    const block = (claim: Claim): AnswerBlock => ({ text: claim.text, claimIds: [claim.id], evidenceIds: claim.evidenceIds });
+    const supported = resolved.claims.filter((claim) => claim.status === "supported");
+    const summary = supported.filter((claim) => ["deadline", "location", "eligibility", "event_date", "organizer", "event_description"].includes(claim.field)).map(block);
+    const requirements = supported.filter((claim) => ["submission_format", "requirements"].includes(claim.field)).map(block);
+    const communityNotes = supported.filter((claim) => claim.nature === "opinion" || claim.field === "community_note").map(block);
     return {
       schemaVersion: "1",
       runId: plan.runId,
-      summary: resolved.claims
-        .filter((claim) => claim.status === "supported")
-        .map((claim) => ({
-        text: claim.text,
-        claimIds: [claim.id],
-        evidenceIds: claim.evidenceIds,
-      })),
+      mode: plan.input?.mode ?? "LIVE_FIXTURE",
+      scope: plan.input?.scope ?? supported[0]?.scope ?? batch.pages[0]?.scope ?? {
+        school: null, campus: null, term: null, course: null, section: null, entity: null,
+      },
+      summary,
+      requirements,
+      communityNotes,
       unknowns: resolved.claims.length === 0
         ? ["No supported facts were found in the checked pages."]
         : resolved.conflicts.some((item) => item.resolution === "unresolved")
@@ -102,6 +109,7 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
       conflicts: resolved.conflicts,
       keyDates: resolved.keyDates,
       coverage,
+      sources: batch.pages.map(({ text: _text, ...source }) => source),
       generatedAt: new Date().toISOString(),
     };
   };
