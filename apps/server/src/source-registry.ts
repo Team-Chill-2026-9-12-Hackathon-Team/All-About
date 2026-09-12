@@ -152,7 +152,7 @@ const candidateSources = [
       entity: null,
     },
     contentMode: "live",
-    access: "public",
+    access: "authorized",
   },
   {
     id: "artsci-exam-conflicts",
@@ -289,7 +289,7 @@ const candidateSources = [
       entity: null,
     },
     contentMode: "live",
-    access: "public",
+    access: "authorized",
   },
   {
     id: "acorn-login",
@@ -306,7 +306,7 @@ const candidateSources = [
       entity: null,
     },
     contentMode: "live",
-    access: "public",
+    access: "authorized",
   },
 ] satisfies SourceConfig[];
 
