@@ -49,10 +49,10 @@ describe("materializePlannerDecision", () => {
       requestedFields: [
         "deadline",
         "submission_format",
-        "requirements",
-        "eligibility",
+        "event_date",
+        "location",
       ],
-      budget: { maxPages: 3, maxSteps: 6, timeoutMs: 90_000 },
+      budget: { maxPages: 3, maxSteps: 8, timeoutMs: 90_000 },
     });
   });
 
@@ -87,6 +87,22 @@ describe("materializePlannerDecision", () => {
     expect(() =>
       materializePlannerDecision("run-1", input, [{ ...source, contentMode: "fixture" }], planDecision),
     ).toThrow(/incompatible with LIVE_WEB/);
+  });
+
+  it("forces course factual fields only for course questions", () => {
+    const courseInput = {
+      ...input,
+      query: "What are the CSC207H1 requirements?",
+      scope: { ...input.scope, course: "CSC207H1", entity: null },
+    };
+    const plan = materializePlannerDecision("run-1", courseInput, [source], planDecision);
+    if (!("requestedFields" in plan)) throw new Error("expected a query plan");
+    expect(plan.requestedFields).toEqual([
+      "deadline",
+      "submission_format",
+      "requirements",
+      "eligibility",
+    ]);
   });
 
   it("treats UTSG and St. George (UTSG) as the same campus", () => {

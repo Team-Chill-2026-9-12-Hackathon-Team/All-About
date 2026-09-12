@@ -133,6 +133,8 @@ describe("minimum demo synthetic preflight", () => {
       "run_status",
       "run_status",
       "browser_step",
+      "browser_step",
+      "browser_step",
       "source_checked",
       "viewer_closed",
       "run_status",

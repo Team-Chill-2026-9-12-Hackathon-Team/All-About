@@ -92,7 +92,25 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
     const supported = resolved.claims.filter((claim) => claim.status === "supported");
     const summary = supported.filter((claim) => ["deadline", "location", "eligibility", "event_date", "organizer", "event_description"].includes(claim.field)).map(block);
     const requirements = supported.filter((claim) => ["submission_format", "requirements"].includes(claim.field)).map(block);
-    const communityNotes = supported.filter((claim) => claim.nature === "opinion" || claim.field === "community_note").map(block);
+    const communityNotes = supported
+      .filter((claim) => claim.nature === "opinion" || claim.field === "community_note")
+      .slice(0, 3)
+      .map(block);
+    const foundFields = new Set(supported.map((claim) => claim.field));
+    const missingRequested = plan.requestedFields.filter((field) => !foundFields.has(field) && field !== "other" && field !== "event_description");
+    const missingLabels = missingRequested.map((field) =>
+      field === "deadline"
+        ? "The requested due date is not stated on the checked public pages."
+        : `${field.replaceAll("_", " ")} was not stated on the checked pages.`,
+    );
+    const unknowns = resolved.claims.length === 0 && missingLabels.length === 0
+      ? ["No supported facts were found in the checked pages."]
+      : [
+          ...missingLabels,
+          ...(resolved.conflicts.some((item) => item.resolution === "unresolved")
+            ? ["Conflicting values require confirmation from an authoritative source."]
+            : []),
+        ];
     return {
       schemaVersion: "1",
       runId: plan.runId,
@@ -103,11 +121,7 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
       summary,
       requirements,
       communityNotes,
-      unknowns: resolved.claims.length === 0
-        ? ["No supported facts were found in the checked pages."]
-        : resolved.conflicts.some((item) => item.resolution === "unresolved")
-          ? ["Conflicting values require confirmation from an authoritative source."]
-          : [],
+      unknowns,
       claims: resolved.claims,
       evidence,
       conflicts: resolved.conflicts,

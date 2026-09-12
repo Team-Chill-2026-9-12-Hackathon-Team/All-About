@@ -67,3 +67,13 @@ test('a pre-cancelled run does not create a Steel session', async () => {
   });
   assert.deepEqual(events, ['source_failed']);
 });
+
+import { fallbackUrlFor, shouldUseFallback } from '../src/fallbacks.ts';
+
+test('blocked campus sites have a public fallback', () => {
+  assert.equal(fallbackUrlFor('hart-house-events', 'https://harthouse.ca/events/month'), 'https://www.utoronto.ca/events');
+  assert.equal(fallbackUrlFor('artsci-academic-dates', 'https://www.artsci.utoronto.ca/current/dates-deadlines/academic-dates'), 'https://artsci.calendar.utoronto.ca/sessional-dates');
+  assert.equal(fallbackUrlFor('reddit-uoft', 'https://old.reddit.com/r/UofT/'), null);
+  assert.equal(shouldUseFallback('ACCESS_BLOCKED'), true);
+  assert.equal(shouldUseFallback('AUTH_REQUIRED'), false);
+});

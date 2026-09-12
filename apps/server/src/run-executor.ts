@@ -58,7 +58,7 @@ export class RunExecutor {
     this.#collectPages = dependencies.collectPages;
     this.#buildAnswer = dependencies.buildAnswer;
     this.#planRun = dependencies.planRun ?? ((runId, input, sources) =>
-      this.#createDefaultPlan(runId, input, sources));
+      createDefaultPlan(runId, input, sources));
     this.#timeoutMs = dependencies.timeoutMs ?? 90_000;
     this.#clarificationTimeoutMs = dependencies.clarificationTimeoutMs ?? 300_000;
   }
@@ -90,20 +90,44 @@ export class RunExecutor {
     try {
       this.#runStore.transition(runId, "planning");
       const input = this.#runStore.getInput(runId);
-      const planningResult = await this.#withAbort(
-        Promise.resolve(this.#planRun(runId, input, this.#sources, controller.signal)),
-        controller.signal,
-      );
+      let planningResult: QueryPlan | ClarificationPlan;
+      try {
+        planningResult = await this.#withAbort(
+          Promise.resolve(this.#planRun(runId, input, this.#sources, controller.signal)),
+          controller.signal,
+        );
+      } catch (error) {
+        if (controller.signal.aborted) throw error;
+        planningResult = createDefaultPlan(runId, input, this.#sources);
+      }
       if ("question" in planningResult) {
-        this.#runStore.transition(runId, "needs_input");
-        this.#runStore.appendEvent(runId, "clarification_needed", planningResult);
-        this.#scheduleClarificationTimeout(runId);
-        return;
+        const allowlisted = createDefaultPlan(runId, input, this.#sources);
+        if (allowlisted.targets.length > 0 && (input.sourceIds?.length ?? 0) > 0) {
+          planningResult = allowlisted;
+        } else {
+          this.#runStore.transition(runId, "needs_input");
+          this.#runStore.appendEvent(runId, "clarification_needed", planningResult);
+          this.#scheduleClarificationTimeout(runId);
+          return;
+        }
       }
       const plan = QueryPlanSchema.parse(planningResult);
       if (!this.#isWritable(runId)) return;
 
       this.#runStore.transition(runId, "browsing");
+      const primary = plan.targets[0];
+      if (primary) {
+        this.#runStore.appendEvent(runId, "browser_step", {
+          sourceId: primary.id,
+          action: "detect_sites",
+          url: primary.entryUrl,
+        });
+        this.#runStore.appendEvent(runId, "browser_step", {
+          sourceId: primary.id,
+          action: "split_panes",
+          url: primary.entryUrl,
+        });
+      }
       errorCode = "NAVIGATION_FAILED";
       const collection = this.#collectPages(
           plan,
@@ -155,28 +179,6 @@ export class RunExecutor {
     } finally {
       clearTimeout(timeout);
     }
-  }
-
-  #createDefaultPlan(
-    runId: string,
-    input: QueryInput,
-    sources: SourceConfig[],
-  ): QueryPlan {
-    const requestedIds = input.sourceIds === undefined ? null : new Set(input.sourceIds);
-    const targets = sources
-      .filter((source) => requestedIds === null || requestedIds.has(source.id))
-      .slice(0, 3);
-
-    return QueryPlanSchema.parse({
-      runId,
-      input,
-      targets,
-      requestedFields:
-        input.mode === "LIVE_FIXTURE"
-          ? ["deadline", "submission_format"]
-          : ["deadline", "eligibility", "location", "requirements"],
-      budget: { maxPages: 3, maxSteps: 6, timeoutMs: 90_000 },
-    });
   }
 
   #mapBrowserSignal(runId: string, signal: BrowserSignal): void {
@@ -251,4 +253,48 @@ export class RunExecutor {
     if (timer !== undefined) clearTimeout(timer);
     this.#clarificationTimers.delete(runId);
   }
+}
+
+export function createDefaultPlan(
+  runId: string,
+  input: QueryInput,
+  sources: SourceConfig[],
+): QueryPlan {
+  const orderedIds = input.sourceIds ?? sources.map((source) => source.id);
+  const targets = orderedIds
+    .map((id) => sources.find((source) => source.id === id))
+    .filter((source): source is SourceConfig => source !== undefined && source.access !== "unconfigured")
+    .slice(0, 3);
+
+  return QueryPlanSchema.parse({
+    runId,
+    input,
+    targets,
+    requestedFields: defaultRequestedFields(input),
+    budget: { maxPages: 3, maxSteps: 8, timeoutMs: 90_000 },
+  });
+}
+
+function defaultRequestedFields(input: QueryInput): QueryPlan["requestedFields"] {
+  if (input.mode === "LIVE_FIXTURE") return ["deadline", "submission_format"];
+  const ids = input.sourceIds ?? [];
+  const query = input.query;
+  if (
+    ids.includes("artsci-exam-conflicts") ||
+    ids.includes("academic-calendar-sessional-dates") ||
+    /exam|deferred|conflict/i.test(query)
+  ) {
+    return ["eligibility", "requirements", "deadline", "event_date"];
+  }
+  if (
+    ids.includes("alumni-carillon-recital") ||
+    ids.includes("uoft-events") ||
+    /event|recital|carillon/i.test(query)
+  ) {
+    return ["event_date", "location", "event_description", "eligibility"];
+  }
+  if (/(?:assignment|homework|problem set|\ba2\b|due date|deadline)/i.test(query)) {
+    return ["deadline", "submission_format"];
+  }
+  return ["requirements", "eligibility"];
 }

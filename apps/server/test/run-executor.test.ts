@@ -69,7 +69,7 @@ describe("RunExecutor", () => {
       const recovered = await app.inject({ method: "GET", url: "/api/runs/run-1" });
       expect(recovered.json()).toMatchObject({
         status: "completed",
-        lastSeq: 10,
+        lastSeq: 12,
         cleanup: "released",
       });
     } finally {
@@ -97,6 +97,8 @@ describe("RunExecutor", () => {
       "run_status",
       "run_status",
       "run_status",
+      "browser_step",
+      "browser_step",
       "browser_step",
       "source_checked",
       "viewer_closed",
@@ -162,6 +164,22 @@ describe("RunExecutor", () => {
     } finally {
       await app.close();
     }
+  });
+
+  it("does not wait for clarification when the client already chose sites", async () => {
+    const store = createStore();
+    store.create({ ...input, sourceIds: [source.id] });
+    const executor = new RunExecutor({
+      runStore: store,
+      sources: [source],
+      collectPages: createMockCollectPages(),
+      buildAnswer: createMockBuildAnswer(),
+      planRun: () => ({ question: "Which term?", missingFields: ["term"] }),
+    });
+
+    executor.start("run-1");
+    expect((await waitForTerminal(store)).status).toBe("completed");
+    expect(store.getSnapshot("run-1").status).not.toBe("needs_input");
   });
 
   it("fails a run when the active processing budget expires", async () => {

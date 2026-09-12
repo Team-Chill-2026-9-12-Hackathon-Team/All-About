@@ -78,6 +78,16 @@ describe("validateAnswerBundle", () => {
     ).toThrow(/outside this run/);
   });
 
+  it("allows a claim course when the query left course unspecified", async () => {
+    const { batch, answer } = await fixture();
+    expect(
+      validateAnswerBundle(plan, batch, {
+        ...answer,
+        claims: [{ ...answer.claims[0]!, scope: { ...scope, course: "CSC207H1" } }],
+      }),
+    ).toMatchObject({ runId: plan.runId });
+  });
+
   it("rejects mismatched claim scope and unplanned coverage", async () => {
     const { batch, answer } = await fixture();
     expect(() =>

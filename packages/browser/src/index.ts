@@ -1,10 +1,12 @@
 import Steel from 'steel-sdk';
 import { chromium, type Browser, type Page } from 'playwright';
 import { BrowserBatchSchema, QueryPlanSchema } from '@allabout/contracts';
+import { fallbackUrlFor, shouldUseFallback } from './fallbacks.js';
 import {
   assertAllowedUrl,
   looksBlocked,
   looksLikeAuthentication,
+  readLinks,
   readVisibleText,
 } from './page-tools.js';
 import type {
@@ -104,9 +106,10 @@ export async function collectPages(
       }
 
       let finalFailure: SourceFailure | null = null;
+      let activeTarget = target;
       for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
-          await collectTarget(page, target, plan, combinedSignal, emit, () => {
+          await collectTarget(page, activeTarget, plan, combinedSignal, emit, () => {
             stepCount += 1;
           }, pages);
           finalFailure = null;
@@ -114,6 +117,18 @@ export async function collectPages(
         } catch (error) {
           debugBrowserError(target.id, error, steelAPIKey);
           finalFailure = classifyTargetError(target.id, error, signal, timeoutController);
+          const fallback = fallbackUrlFor(target.id, activeTarget.entryUrl);
+          if (
+            attempt === 0 &&
+            fallback &&
+            shouldUseFallback(finalFailure.code) &&
+            !combinedSignal.aborted &&
+            stepCount + 2 <= plan.budget.maxSteps
+          ) {
+            emit({ type: 'step', sourceId: target.id, action: 'fallback_source', url: fallback });
+            activeTarget = { ...target, entryUrl: fallback };
+            continue;
+          }
           const canRetry =
             attempt === 0 &&
             finalFailure.retryable &&
@@ -124,6 +139,21 @@ export async function collectPages(
       }
       if (finalFailure) {
         addFailure(failures, emit, finalFailure);
+      }
+    }
+
+    const primary = pickPrimaryPage(plan, pages);
+    if (primary && !combinedSignal.aborted) {
+      emit({ type: 'step', sourceId: primary.sourceId, action: 'navigate', url: primary.url });
+      await page.goto(primary.url, {
+        waitUntil: 'domcontentloaded',
+        timeout: Math.min(15_000, remainingMs(plan, timeoutController)),
+      }).catch(() => undefined);
+      emit({ type: 'step', sourceId: primary.sourceId, action: 'hold_for_viewer', url: primary.url });
+      try {
+        await holdForViewer(2_000, combinedSignal);
+      } catch {
+        /* snapshots are already stored */
       }
     }
 
@@ -201,6 +231,12 @@ async function collectTarget(
     throw new BrowserTargetError('ACCESS_BLOCKED', 'The source returned an access check or block page.', true);
   }
   if (looksLikeAuthentication(status, finalUrl.href)) {
+    emit({ type: 'step', sourceId: target.id, action: 'hold_for_viewer', url: finalUrl.href });
+    try {
+      await holdForViewer(2_000, signal);
+    } catch {
+      /* still report the login wall */
+    }
     throw new BrowserTargetError('AUTH_REQUIRED', 'The source redirected to an authentication page.', false);
   }
   if (status !== null && status >= 400) {
@@ -214,21 +250,42 @@ async function collectTarget(
     throw new BrowserTargetError('NO_MATCH', 'The page did not expose enough visible text to use.', true);
   }
 
+  const links = await readLinks(page, target.allowedHosts);
+  const linkLines = links
+    .filter((link) => /^https:\/\//.test(link.url))
+    .slice(0, 20)
+    .map((link) => `Visible link: ${link.text || '(untitled)'} ${link.url}`);
+  const text = linkLines.length > 0 ? `${read.text}\n\n${linkLines.join('\n')}` : read.text;
+
   const snapshot: PageSnapshot = {
     id: `${plan.runId}:${target.id}:${pages.length + 1}`,
     sourceId: target.id,
     url: finalUrl.href,
     title: read.title,
-    text: read.text,
+    text,
     fetchedAt: new Date().toISOString(),
     publishedAt: read.publishedAt,
     updatedAt: read.updatedAt,
-    scope: { ...target.scope },
+    scope: { ...target.scope, entity: target.scope.entity ?? read.title },
     kind: target.kind,
     contentMode: target.contentMode,
   };
   pages.push(snapshot);
   emit({ type: 'page_read', snapshot });
+  emit({ type: 'step', sourceId: target.id, action: 'hold_for_viewer', url: finalUrl.href });
+  try {
+    await holdForViewer(2_000, signal);
+  } catch {
+    // The page is already captured; a cancelled hold must not drop the snapshot.
+  }
+}
+
+async function holdForViewer(ms: number, signal: AbortSignal): Promise<void> {
+  const started = Date.now();
+  while (Date.now() - started < ms) {
+    throwIfAborted(signal);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
 }
 
 function validatePlan(plan: QueryPlan): void {
@@ -287,6 +344,19 @@ function failureForAbort(
 
 function cancelled(sourceId: string): SourceFailure {
   return { sourceId, code: 'CANCELLED', message: 'The browser run was cancelled.', retryable: true };
+}
+
+function pickPrimaryPage(plan: QueryPlan, pages: PageSnapshot[]): PageSnapshot | undefined {
+  const asked = plan.input.scope.course?.toLowerCase().replace(/h1|y1/g, "") ?? "";
+  const official = pages.filter((page) => page.kind === "official");
+  if (asked) {
+    const match = official.find((page) => {
+      const hay = `${page.url} ${page.title} ${page.scope.course ?? ""}`.toLowerCase();
+      return hay.includes(asked);
+    });
+    if (match) return match;
+  }
+  return official[0] ?? pages[0];
 }
 
 function addFailure(

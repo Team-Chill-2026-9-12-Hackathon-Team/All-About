@@ -24,9 +24,12 @@ function duplicateIds(ids: string[]): string[] {
 }
 
 function sameScope(left: Scope, right: Scope): boolean {
-  return Object.keys(left).every(
-    (key) => left[key as keyof Scope] === right[key as keyof Scope],
-  );
+  return (Object.keys(left) as (keyof Scope)[]).every((key) => {
+    const leftValue = left[key];
+    const rightValue = right[key];
+    if (leftValue === null || rightValue === null) return true;
+    return leftValue === rightValue;
+  });
 }
 
 function normalizeText(value: string): string {

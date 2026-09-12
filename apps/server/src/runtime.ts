@@ -7,7 +7,7 @@ import type {
 import { buildAnswer as buildWithEvidence } from "@allabout/evidence";
 
 import { createOpenAiRunPlanner } from "./openai-planner.js";
-import { RunExecutor, type RunPlanner } from "./run-executor.js";
+import { createDefaultPlan, RunExecutor, type RunPlanner } from "./run-executor.js";
 import { RunStore } from "./run-store.js";
 
 export interface RuntimeOptions {
@@ -51,5 +51,16 @@ function createConfiguredOpenAiPlanner(options: RuntimeOptions): RunPlanner {
       "OPENAI_API_KEY and OPENAI_MODEL are required when no planner override is provided.",
     );
   }
-  return createOpenAiRunPlanner({ apiKey: options.apiKey, model: options.model });
+  const openai = createOpenAiRunPlanner({ apiKey: options.apiKey, model: options.model });
+  return async (runId, input, sources, signal) => {
+    if (input.sourceIds !== undefined && input.sourceIds.length > 0) {
+      return createDefaultPlan(runId, input, sources);
+    }
+    try {
+      return await openai(runId, input, sources, signal);
+    } catch (error) {
+      if (signal.aborted) throw error;
+      return createDefaultPlan(runId, input, sources);
+    }
+  };
 }

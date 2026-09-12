@@ -248,3 +248,112 @@ test("different dates without update language remain unresolved", () => {
   assert.ok(result.claims.every((item) => item.status === "conflict"));
   assert.ok(result.keyDates.every((item) => item.status === "needs_confirmation"));
 });
+
+test("does not treat an off-topic course calendar as the asked course", async () => {
+  const plan: QueryPlan = {
+    ...makePlan("course-filter", ["requirements"]),
+    input: {
+      query: "What are the prerequisites for CSC207H1?",
+      scope: { ...scope, course: "CSC207H1", entity: null },
+      mode: "LIVE_WEB",
+    },
+  };
+  const result = await buildAnswer(plan, {
+    pages: [
+      {
+        id: "wrong",
+        sourceId: "official",
+        url: "https://artsci.calendar.utoronto.ca/course/csc148h1",
+        title: "CSC148H1 | Academic Calendar",
+        text: "Prerequisite 60% or higher in CSC108H1. Students must have completed the prerequisite.",
+        fetchedAt: "2026-09-12T12:00:00-04:00",
+        publishedAt: null,
+        updatedAt: null,
+        scope: { ...scope, course: "CSC148H1", entity: null },
+        kind: "official",
+        contentMode: "live",
+      },
+      {
+        id: "right",
+        sourceId: "official",
+        url: "https://artsci.calendar.utoronto.ca/course/csc207h1",
+        title: "CSC207H1 | Academic Calendar",
+        text: "Prerequisite 60% or higher in CSC148H1. Students must have completed the prerequisite.",
+        fetchedAt: "2026-09-12T12:00:00-04:00",
+        publishedAt: null,
+        updatedAt: null,
+        scope: { ...scope, course: "CSC207H1", entity: null },
+        kind: "official",
+        contentMode: "live",
+      },
+    ],
+    failures: [],
+    cleanup: "released",
+  }, new AbortController().signal);
+
+  assert.equal(result.claims.every((claim) => claim.scope.course === "CSC207H1"), true);
+  assert.ok(result.claims[0]!.text.includes("CSC148H1"));
+});
+
+test("assignment questions stay unknown when no due date is on the page", async () => {
+  const plan: QueryPlan = {
+    ...makePlan("a2-unknown", ["deadline", "submission_format"]),
+    input: {
+      query: "When is CSC207 Assignment 2 due?",
+      scope: { ...scope, course: "CSC207H1", entity: null },
+      mode: "LIVE_WEB",
+    },
+  };
+  const result = await buildAnswer(plan, {
+    pages: [{
+      id: "calendar",
+      sourceId: "official",
+      url: "https://artsci.calendar.utoronto.ca/course/csc207h1",
+      title: "CSC207H1 | Academic Calendar",
+      text: "Prerequisite 60% or higher in CSC148H1. Visible link: Degree Requirements https://artsci.calendar.utoronto.ca/",
+      fetchedAt: "2026-09-12T12:00:00-04:00",
+      publishedAt: null,
+      updatedAt: null,
+      scope: { ...scope, course: "CSC207H1", entity: null },
+      kind: "official",
+      contentMode: "live",
+    }],
+    failures: [],
+    cleanup: "released",
+  }, new AbortController().signal);
+
+  assert.equal(result.claims.length, 0);
+  assert.ok(result.unknowns.some((item) => /due date/i.test(item)));
+});
+
+test("reddit-style pages become community notes, not official requirements", async () => {
+  const plan: QueryPlan = {
+    ...makePlan("reddit-note", ["deadline"], "reddit"),
+    input: {
+      query: "When is CSC207 Assignment 2 due?",
+      scope: { ...scope, course: "CSC207H1", entity: null },
+      mode: "LIVE_WEB",
+    },
+  };
+  const result = await buildAnswer(plan, {
+    pages: [{
+      id: "reddit",
+      sourceId: "reddit",
+      url: "https://old.reddit.com/r/UofT/search?q=CSC207",
+      title: "CSC207 search results",
+      text: "Has anyone in CSC207 heard when A2 is due? The instructor usually posts it on Piazza.",
+      fetchedAt: "2026-09-12T12:00:00-04:00",
+      publishedAt: null,
+      updatedAt: null,
+      scope: { ...scope, course: "CSC207H1", entity: null },
+      kind: "community",
+      contentMode: "live",
+    }],
+    failures: [],
+    cleanup: "released",
+  }, new AbortController().signal);
+
+  assert.ok(result.communityNotes.length > 0);
+  assert.equal(result.claims[0]!.nature, "opinion");
+  assert.equal(result.claims[0]!.field, "community_note");
+});
