@@ -265,4 +265,25 @@ describe("RunExecutor", () => {
       payload: { code: "NAVIGATION_FAILED", message: "Synthetic adapter failure." },
     });
   });
+
+  it("rejects an invalid answer before it can enter the run snapshot", async () => {
+    const store = createStore();
+    store.create(input);
+    const executor = new RunExecutor({
+      runStore: store,
+      sources: [source],
+      collectPages: createMockCollectPages(),
+      buildAnswer: createMockBuildAnswer((plan, answer) => ({
+        ...answer,
+        runId: `${plan.runId}-wrong`,
+      })),
+    });
+
+    executor.start("run-1");
+    const snapshot = await waitForTerminal(store);
+    expect(snapshot.status).toBe("failed");
+    expect(snapshot.answer).toBeNull();
+    const events = store.openEventStream("run-1", 0, () => undefined).replay;
+    expect(events.at(-2)).toMatchObject({ type: "run_error", payload: { code: "MODEL_FAILED" } });
+  });
 });

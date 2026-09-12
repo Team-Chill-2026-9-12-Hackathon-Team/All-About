@@ -9,6 +9,7 @@ import {
   type SourceConfig,
 } from "@allabout/contracts";
 
+import { validateAnswerBundle } from "./answer-validator.js";
 import { isTerminalRunStatus, RunStore } from "./run-store.js";
 
 export interface RunExecutorDependencies {
@@ -119,12 +120,13 @@ export class RunExecutor {
       });
       this.#runStore.transition(runId, "synthesizing");
       errorCode = "MODEL_FAILED";
-      const answer = await this.#withAbort(
+      const candidateAnswer = await this.#withAbort(
         this.#buildAnswer(plan, batch, controller.signal),
         controller.signal,
       );
       if (!this.#isWritable(runId)) return;
 
+      const answer = validateAnswerBundle(plan, batch, candidateAnswer);
       this.#runStore.setAnswer(runId, answer);
       const finalStatus: RunStatus =
         batch.failures.length > 0 || answer.unknowns.length > 0
