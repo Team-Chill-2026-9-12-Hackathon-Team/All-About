@@ -33,8 +33,20 @@ const runtime =
     : undefined;
 const app =
   runtime === undefined
-    ? buildApp({ logger: true }, { sources: liveSourceRegistry, credentialVault })
-    : buildApp({ logger: true }, { ...runtime, credentialVault });
+    ? buildApp(
+        { logger: true },
+        {
+          sources: liveSourceRegistry,
+          ...(credentialVault === undefined ? {} : { credentialVault }),
+        },
+      )
+    : buildApp(
+        { logger: true },
+        {
+          ...runtime,
+          ...(credentialVault === undefined ? {} : { credentialVault }),
+        },
+      );
 
 if (!serverConfig.openAiConfigured) {
   app.log.warn(
