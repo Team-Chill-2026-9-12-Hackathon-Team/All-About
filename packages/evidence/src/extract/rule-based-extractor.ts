@@ -7,6 +7,13 @@ const URL = /https?:\/\/[^\s<>"']+/i;
 
 export type AuthorityRegistry = Record<string, { authority: Authority; basis: string }>;
 
+const DEFAULT_AUTHORITY_REGISTRY: AuthorityRegistry = {
+  "demo101-syllabus": { authority: "institution", basis: "Fixture source registry" },
+  "demo101-announcement": { authority: "instructor", basis: "Fixture source registry" },
+  "demo101-instructor": { authority: "instructor", basis: "Fixture source registry" },
+  "demo101-student-discussion": { authority: "student", basis: "Student discussion fixture" },
+};
+
 function segments(text: string): string[] {
   return text
     .replace(/\r/g, "")
@@ -37,7 +44,7 @@ function trimUrl(value: string): string {
 }
 
 export class RuleBasedExtractor implements CandidateExtractor {
-  constructor(private readonly registry: AuthorityRegistry = {}) {}
+  constructor(private readonly registry: AuthorityRegistry = DEFAULT_AUTHORITY_REGISTRY) {}
 
   async extract(
     plan: QueryPlan,
@@ -63,7 +70,9 @@ export class RuleBasedExtractor implements CandidateExtractor {
           results.push(candidate(snapshot, "registration_link", cleanUrl, sentence, authority, authorityBasis, { dedupeValue: cleanUrl }));
         }
 
-        const isDeadline = /(?:registration|application|submission|RSVP|tickets?)/i.test(sentence) && /(?:closes?|deadline|due|by)\b/i.test(sentence);
+        const isDeadline =
+          /(?:registration|application|submission|RSVP|tickets?|assignment|homework|problem set)/i.test(sentence)
+          && /(?:closes?|deadline|due|by|extended)\b/i.test(sentence);
         if (requested(plan, "deadline") && isDeadline) {
           const dateRaw = sentence.match(DATE)?.[0];
           if (dateRaw) results.push(candidate(snapshot, "deadline", sentence, sentence, authority, authorityBasis, { dateRaw, dedupeValue: dateRaw }));

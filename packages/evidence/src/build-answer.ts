@@ -108,7 +108,7 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
     for (const requestedField of new Set(plan.requestedFields.map(canonicalField))) {
       if (!presentFields.has(requestedField)) {
         const entity = plan.input.scope.entity ? ` for ${plan.input.scope.entity}` : "";
-        unknowns.push(`The checked sources did not provide ${requestedField}${entity}.`);
+        unknowns.push(`The checked sources did not provide ${requestedField.replaceAll("_", " ")}${entity}.`);
       }
     }
     for (const conflict of resolved.conflicts.filter((item) => item.resolution === "unresolved")) {

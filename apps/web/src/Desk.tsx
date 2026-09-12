@@ -325,7 +325,6 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
   const [storageError, setStorageError] = useState(false);
   const [clarifyText, setClarifyText] = useState('');
   const [archPhase, setArchPhase] = useState<SearchPhase>('detect');
-  const [vaultOpen, setVaultOpen] = useState(false);
   const feed = useRef<HTMLDivElement>(null);
   const chat = useRef<HTMLDivElement>(null);
   const dialog = useRef<HTMLElement>(null);
@@ -511,14 +510,6 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
         </button>
         <div className="header-actions">
           <button className="tools-back" onClick={onBack}><LayoutGrid size={16} />My tools</button>
-          <button
-            className={`vault-trigger ${vaultOpen ? 'is-active' : ''}`}
-            aria-label="Open password vault"
-            aria-expanded={vaultOpen}
-            onClick={() => { setVaultOpen(true); setDrawer(false); setSettings(false); }}
-          >
-            <KeyRound size={17} />
-          </button>
           <span className="term">U of T · Fall 2026</span>
           <span className="mode-chip" aria-label="Run mode">{run?.mode ?? 'LIVE_WEB'}</span>
           <button
