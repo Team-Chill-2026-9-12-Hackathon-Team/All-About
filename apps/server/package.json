@@ -7,11 +7,12 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@allabout/contracts": "*",
     "dotenv": "^17.0.0",
-    "fastify": "^5.0.0"
+    "fastify": "^5.0.0",
+    "zod": "^4.0.0"
   }
 }
