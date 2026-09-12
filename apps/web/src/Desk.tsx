@@ -98,11 +98,11 @@ function CampusSetup({onContinue,onLogout}:{onContinue:(features:string[])=>void
 }
 type AuthMode='login'|'create'|'verify'|'forgot';
 function AuthGate(){
- const [mode,setMode]=useState<AuthMode>('login'),[showPassword,setShowPassword]=useState(false),[method,setMethod]=useState<'email'|'phone'>('email'),[loading,setLoading]=useState(false),[entering,setEntering]=useState(false),[authenticated,setAuthenticated]=useState(false),[features,setFeatures]=useState<string[]|null>(null),[notice,setNotice]=useState('');
- const enter=()=>{setEntering(true);setTimeout(()=>{setEntering(false);setAuthenticated(true);},1250);};
+ const [mode,setMode]=useState<AuthMode>('login'),[showPassword,setShowPassword]=useState(false),[method,setMethod]=useState<'email'|'phone'>('email'),[loading,setLoading]=useState(false),[entering,setEntering]=useState(false),[keepSignedIn,setKeepSignedIn]=useState(true),[authenticated,setAuthenticated]=useState(()=>{try{return Number(localStorage.getItem('allabout-session-until'))>Date.now();}catch{return false;}}),[features,setFeatures]=useState<string[]|null>(null),[notice,setNotice]=useState('');
+ const enter=(remember=keepSignedIn)=>{if(remember)try{localStorage.setItem('allabout-session-until',String(Date.now()+30*24*60*60*1000));}catch{}setEntering(true);setTimeout(()=>{setEntering(false);setAuthenticated(true);},1250);};
  const submit=(e:React.FormEvent)=>{e.preventDefault(); if(mode==='create'||mode==='forgot'){setMode('verify');setNotice(`A six-digit code was sent to your ${method==='email'?'email address':'phone number'}.`);return;} setLoading(true);setTimeout(()=>{setLoading(false);enter();},650);};
  const verify=(e:React.FormEvent)=>{e.preventDefault();setLoading(true);setTimeout(()=>{setLoading(false);enter();},650);};
- const logOut=()=>{setAuthenticated(false);setFeatures(null);setMode('login');};
+ const logOut=()=>{try{localStorage.removeItem('allabout-session-until');}catch{}setAuthenticated(false);setFeatures(null);setMode('login');};
  if(authenticated&&features)return <Workspace features={features} onBack={()=>setFeatures(null)} onLogout={logOut}/>;
  if(authenticated)return <CampusSetup onContinue={setFeatures} onLogout={logOut}/>;
  if(entering)return <div className="launch-screen" aria-label="Entering AllAbout Campus"><div className="launch-orbit"/><div className="launch-logo">a.</div><p>AllAbout <b>Campus</b></p><span>Finding your campus, one page at a time.</span></div>;
