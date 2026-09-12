@@ -374,8 +374,8 @@ to{transform:translateX(0)}
 .text-auth{color:#00799a;font-size:12px;margin-top:3px}
 .auth-foot{font-size:13px!important;margin:25px 0 0!important}
 .auth-foot button{color:#00799a;font-weight:650}
-.remember-session{display:flex;align-items:center;gap:9px;margin-top:16px;color:#31617d;font-size:12px;font-weight:650;cursor:pointer;user-select:none}
-.remember-session input{appearance:none;width:18px;height:18px;margin:0;border:1.5px solid #7795ad;border-radius:4px;background:#fff;display:grid;place-content:center;cursor:pointer}
+.auth-card .remember-session{display:flex;flex-direction:row;align-items:center;gap:8px;margin-top:16px;color:#31617d;font-size:12px;font-weight:650;cursor:pointer;user-select:none}
+.auth-card .remember-session input{appearance:none;flex:0 0 16px;width:16px;height:16px;min-height:16px;padding:0;margin:0;border:1.5px solid #7795ad;border-radius:4px;background:#fff;display:grid;place-content:center;cursor:pointer}
 .remember-session input:checked{background:#005d91;border-color:#005d91}
 .remember-session input:checked:after{content:'✓';color:#fff;font-size:13px;line-height:1;font-weight:800}
 .remember-session input:focus-visible{outline:3px solid #7bc6db;outline-offset:2px}
