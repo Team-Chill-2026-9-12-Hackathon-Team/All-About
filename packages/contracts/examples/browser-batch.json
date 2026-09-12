@@ -1,0 +1,46 @@
+{
+  "pages": [
+    {
+      "id": "snapshot-syllabus",
+      "sourceId": "demo101-syllabus",
+      "url": "https://fixture.example.edu/demo101/syllabus",
+      "title": "DEMO101 syllabus — fictional demo",
+      "text": "Assignment 2 is due September 18, 2026 at 17:00 America/Toronto. Submit one PDF.",
+      "fetchedAt": "2026-09-12T12:00:00-04:00",
+      "publishedAt": "2026-09-01T09:00:00-04:00",
+      "updatedAt": null,
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George (UTSG)",
+        "term": "Fall 2026",
+        "course": "DEMO101",
+        "section": null,
+        "entity": "Assignment 2"
+      },
+      "kind": "official",
+      "contentMode": "fixture"
+    },
+    {
+      "id": "snapshot-announcement",
+      "sourceId": "demo101-announcement",
+      "url": "https://fixture.example.edu/demo101/announcement",
+      "title": "DEMO101 instructor announcement — fictional demo",
+      "text": "Instructor announcement: Assignment 2 is extended to September 20, 2026 at 17:00 America/Toronto. All other submission requirements remain unchanged.",
+      "fetchedAt": "2026-09-12T12:00:04-04:00",
+      "publishedAt": "2026-09-12T10:00:00-04:00",
+      "updatedAt": null,
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George (UTSG)",
+        "term": "Fall 2026",
+        "course": "DEMO101",
+        "section": null,
+        "entity": "Assignment 2"
+      },
+      "kind": "course_discussion",
+      "contentMode": "fixture"
+    }
+  ],
+  "failures": [],
+  "cleanup": "released"
+}

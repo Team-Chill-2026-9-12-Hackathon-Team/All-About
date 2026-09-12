@@ -1,0 +1,187 @@
+{
+  "schemaVersion": "1",
+  "runId": "run-demo101-a2",
+  "mode": "LIVE_FIXTURE",
+  "scope": {
+    "school": "University of Toronto",
+    "campus": "St. George (UTSG)",
+    "term": "Fall 2026",
+    "course": "DEMO101",
+    "section": null,
+    "entity": "Assignment 2"
+  },
+  "summary": [
+    {
+      "text": "A2 的截止时间已延至 2026-09-20 17:00（America/Toronto）。",
+      "claimIds": ["claim-new-deadline"],
+      "evidenceIds": ["evidence-announcement"]
+    }
+  ],
+  "requirements": [
+    {
+      "text": "提交格式仍为一个 PDF。",
+      "claimIds": ["claim-pdf"],
+      "evidenceIds": ["evidence-syllabus", "evidence-announcement"]
+    }
+  ],
+  "communityNotes": [],
+  "unknowns": ["所查资料未说明迟交罚则。"],
+  "claims": [
+    {
+      "id": "claim-old-deadline",
+      "field": "deadline",
+      "text": "原截止时间为 2026-09-18 17:00（America/Toronto）。",
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George (UTSG)",
+        "term": "Fall 2026",
+        "course": "DEMO101",
+        "section": null,
+        "entity": "Assignment 2"
+      },
+      "nature": "fact",
+      "status": "superseded",
+      "evidenceIds": ["evidence-syllabus"],
+      "dateValue": {
+        "precision": "instant",
+        "iso": "2026-09-18T17:00:00-04:00",
+        "timezone": "America/Toronto"
+      }
+    },
+    {
+      "id": "claim-new-deadline",
+      "field": "deadline",
+      "text": "截止时间更新为 2026-09-20 17:00（America/Toronto）。",
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George (UTSG)",
+        "term": "Fall 2026",
+        "course": "DEMO101",
+        "section": null,
+        "entity": "Assignment 2"
+      },
+      "nature": "fact",
+      "status": "supported",
+      "evidenceIds": ["evidence-announcement"],
+      "dateValue": {
+        "precision": "instant",
+        "iso": "2026-09-20T17:00:00-04:00",
+        "timezone": "America/Toronto"
+      }
+    },
+    {
+      "id": "claim-pdf",
+      "field": "submission_format",
+      "text": "提交一个 PDF。",
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George (UTSG)",
+        "term": "Fall 2026",
+        "course": "DEMO101",
+        "section": null,
+        "entity": "Assignment 2"
+      },
+      "nature": "fact",
+      "status": "supported",
+      "evidenceIds": ["evidence-syllabus", "evidence-announcement"]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "evidence-syllabus",
+      "snapshotId": "snapshot-syllabus",
+      "quote": "Assignment 2 is due September 18, 2026 at 17:00 America/Toronto. Submit one PDF.",
+      "locator": "Assignment 2",
+      "authority": "institution",
+      "authorityBasis": "Fictional course syllabus fixture"
+    },
+    {
+      "id": "evidence-announcement",
+      "snapshotId": "snapshot-announcement",
+      "quote": "Instructor announcement: Assignment 2 is extended to September 20, 2026 at 17:00 America/Toronto. All other submission requirements remain unchanged.",
+      "locator": "Instructor announcement",
+      "authority": "instructor",
+      "authorityBasis": "Fictional instructor role label in fixture"
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "conflict-deadline-update",
+      "claimIds": ["claim-old-deadline", "claim-new-deadline"],
+      "field": "deadline",
+      "resolution": "explicit_update",
+      "selectedClaimId": "claim-new-deadline",
+      "explanation": "同一课程、学期和作业的教师公告明确延长了原截止时间。",
+      "evidenceIds": ["evidence-syllabus", "evidence-announcement"]
+    }
+  ],
+  "keyDates": [
+    {
+      "id": "date-a2-deadline",
+      "label": "A2 截止时间",
+      "value": {
+        "precision": "instant",
+        "iso": "2026-09-20T17:00:00-04:00",
+        "timezone": "America/Toronto"
+      },
+      "claimId": "claim-new-deadline",
+      "evidenceIds": ["evidence-announcement"],
+      "status": "confirmed"
+    }
+  ],
+  "coverage": [
+    {
+      "sourceId": "demo101-syllabus",
+      "status": "checked",
+      "reason": null,
+      "snapshotIds": ["snapshot-syllabus"]
+    },
+    {
+      "sourceId": "demo101-announcement",
+      "status": "checked",
+      "reason": null,
+      "snapshotIds": ["snapshot-announcement"]
+    }
+  ],
+  "sources": [
+    {
+      "id": "snapshot-syllabus",
+      "sourceId": "demo101-syllabus",
+      "url": "https://fixture.example.edu/demo101/syllabus",
+      "title": "DEMO101 syllabus — fictional demo",
+      "fetchedAt": "2026-09-12T12:00:00-04:00",
+      "publishedAt": "2026-09-01T09:00:00-04:00",
+      "updatedAt": null,
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George (UTSG)",
+        "term": "Fall 2026",
+        "course": "DEMO101",
+        "section": null,
+        "entity": "Assignment 2"
+      },
+      "kind": "official",
+      "contentMode": "fixture"
+    },
+    {
+      "id": "snapshot-announcement",
+      "sourceId": "demo101-announcement",
+      "url": "https://fixture.example.edu/demo101/announcement",
+      "title": "DEMO101 instructor announcement — fictional demo",
+      "fetchedAt": "2026-09-12T12:00:04-04:00",
+      "publishedAt": "2026-09-12T10:00:00-04:00",
+      "updatedAt": null,
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George (UTSG)",
+        "term": "Fall 2026",
+        "course": "DEMO101",
+        "section": null,
+        "entity": "Assignment 2"
+      },
+      "kind": "course_discussion",
+      "contentMode": "fixture"
+    }
+  ],
+  "generatedAt": "2026-09-12T12:00:06-04:00"
+}

@@ -1,0 +1,58 @@
+{
+  "runId": "run-demo101-a2",
+  "input": {
+    "query": "DEMO101 A2 的截止日期更新了吗？",
+    "scope": {
+      "school": "University of Toronto",
+      "campus": "St. George (UTSG)",
+      "term": "Fall 2026",
+      "course": "DEMO101",
+      "section": null,
+      "entity": "Assignment 2"
+    },
+    "sourceIds": ["demo101-syllabus", "demo101-announcement"],
+    "mode": "LIVE_FIXTURE"
+  },
+  "targets": [
+    {
+      "id": "demo101-syllabus",
+      "kind": "official",
+      "label": "DEMO101 syllabus",
+      "entryUrl": "https://fixture.example.edu/demo101/syllabus",
+      "allowedHosts": ["fixture.example.edu"],
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George (UTSG)",
+        "term": "Fall 2026",
+        "course": "DEMO101",
+        "section": null,
+        "entity": "Assignment 2"
+      },
+      "contentMode": "fixture",
+      "access": "public"
+    },
+    {
+      "id": "demo101-announcement",
+      "kind": "course_discussion",
+      "label": "DEMO101 instructor announcement",
+      "entryUrl": "https://fixture.example.edu/demo101/announcement",
+      "allowedHosts": ["fixture.example.edu"],
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George (UTSG)",
+        "term": "Fall 2026",
+        "course": "DEMO101",
+        "section": null,
+        "entity": "Assignment 2"
+      },
+      "contentMode": "fixture",
+      "access": "public"
+    }
+  ],
+  "requestedFields": ["deadline", "submission_format"],
+  "budget": {
+    "maxPages": 3,
+    "maxSteps": 6,
+    "timeoutMs": 90000
+  }
+}
