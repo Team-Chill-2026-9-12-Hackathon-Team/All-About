@@ -1,0 +1,10 @@
+{
+  "name": "@allabout/evidence",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "smoke": "node src/smoke.ts",
+    "test": "node --test test/*.test.ts"
+  }
+}
