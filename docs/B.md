@@ -22,6 +22,8 @@
 - 当前登录 GitHub 账号：`Ziqinxu93`。最近一次推送返回 403；权限查询显示 `pull: true`、`push: false`。
 - 本次学校范围和沟通规则更新保存为本地提交，等待仓库写权限开通后与首次提交一起同步。未把任何本地提交描述成远端已同步。
 - GitHub 写权限现已生效；计划提交 `cef933c`、范围更新 `6f7aaf3` 已同步至 `origin/feat/orchestrator`。
+- B0 工程骨架提交 `408a372`、健康接口提交 `e247cab`、B1 契约草案提交 `1e8393a` 均已同步至 `origin/feat/orchestrator`。
+- 已创建 PR #1：`https://github.com/Team-Chill-2026-9-12-Hackathon-Team/All-About/pull/1`，从 `feat/orchestrator` 合入 `main`；当前状态为 open，尚未合并。
 - 工程骨架通过 server/contracts TypeScript 检查；Vitest 已能启动，但此切片尚无测试文件，测试命令按预期以“无测试文件”退出，不能记作测试通过。
 - 后端配置与健康接口通过 TypeScript 检查和 4 个 Vitest 测试；真实启动烟测访问 `http://127.0.0.1:3001/api/health` 得到 `{ok:true}`。
 - 根级 `npm run typecheck` 通过；根级 `npm test` 通过，共 3 个测试文件、9 个测试。B1 测试覆盖五份共享样例和三类非法边界输入。
