@@ -21,6 +21,8 @@
 - 增加两个仅供自动化测试使用的可控 mock adapter；其内容明确标注为 synthetic fixture，不通过默认产品接口冒充实时 UTSG 数据。真实 C/D 依赖尚未接入。
 - B3 超时与澄清切片：活动处理预算到期会 abort adapter 并稳定进入 failed；needs_input 使用独立等待时限，提交澄清后在同一 run 上继续，过期前不会启动浏览器。
 - B4 边界校验首片：D 候选答案在写入前验证 run/mode/scope、一致且唯一的 ID、所有引用、规划来源范围，并以规范化空白后的原文检查 evidence quote；损坏答案进入稳定 failed，不污染 run 快照。
+- B4 OpenAI 规划器首片：按官方 Responses API Structured Outputs 用法提供可注入规划器，模型只看到去 URL 的 registry 摘要；服务端再次限制来源 ID、用户 allowlist、access、scope、运行模式和 3/3/6/90s 预算。模型名称只读取调用方配置，未调用真实 API。
+- 用户已指定应用 API 模型为 `gpt-5-mini`；本地忽略的 `.env` 已设置 `OPENAI_MODEL=gpt-5-mini`。API key 保持原值且未输出、未暂存。
 
 ## 验证与同步
 
@@ -40,6 +42,8 @@
 - 注入式执行器 5 个针对性测试通过，覆盖 HTTP 创建后的自动执行、完整事件顺序、partial、取消/abort/迟到结果隔离，以及 adapter 失败。
 - B3 执行器当前共 8 个针对性测试；全仓共 6 个测试文件、34 个测试通过。新增覆盖处理超时、澄清续跑和澄清等待过期。
 - B4 答案边界校验 6 个专项测试，并增加执行器损坏答案拒绝测试；全仓当前 7 个测试文件、41 个测试通过。覆盖跨 run/mode、重复或缺失引用、正文不存在的 quote、scope、未规划来源和被篡改的公开来源元数据。
+- 已安装并锁定官方 OpenAI Node SDK 6.49.0；选择 6.x 是为了保留项目 Node ≥20 的团队兼容范围（7.15.0 要求 Node ≥22）。安装审计为 0 个已知漏洞。OpenAI 规划器 6 个专项测试通过；全仓当前 8 个测试文件、47 个测试通过。
+- `gpt-5-mini` 真实最小规划 smoke 通过：Responses API 返回 plan，并且服务端最终只接受 synthetic allowlist source；请求未使用真实 UTSG 事实。可复现命令：`npm run smoke:planner --workspace @allabout/server`。
 
 ## 当前边界
 
@@ -48,4 +52,4 @@
 - 真实密钥已安全复制到此 checkout 的 `.env`，该文件被 Git 忽略；未输出或暂存密钥。
 - 当前 Codex 运行环境能运行 Node，但没有全局 `npm` 命令；通过临时 npm 12.0.2 完成依赖安装。团队普通 Node/npm 环境可直接使用锁文件；本地后续检查可直接调用已安装工具。
 - 正常团队命令：`npm install`、`npm run dev:server`、`npm run typecheck`、`npm test`。当前 Codex 终端的验证使用锁文件中相同工具直接执行，并额外完成真实服务烟测。
-- 下一步：明确并补齐更细的清理生命周期，然后开始 B4 的受限来源规划与结果引用校验；真实 C/D 接口到达后再做集成。具体演示课程/活动尚未选定，推进到依赖该选择的步骤时及时问用户。
+- 下一步：明确更细的清理生命周期，并检查 C/D 远端分支是否已有可接入的公共实现。具体演示课程/活动尚未选定，推进到依赖该选择的步骤时及时问用户。

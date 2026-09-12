@@ -164,7 +164,7 @@ SSE：`id: runId:seq`、`event: type`、`data: JSON`。同 run 序号严格递�
 | U1 | C 被取消/超时后，如何返回已读页面和最终 cleanup；原契约没有清理失败后的重试公共入口 | C 内部 finally 做有界释放；B 缓存实际 page_read 信号；不由 B 自行再释放 | B3 前与 C 确认 abort 返回/抛错约定、最终清理报告和最多等待多久 |
 | U2 | BrowserSignal 缺少释放通知；viewer 可能在 buildAnswer 前就结束，GET run 也未规定 cleanup 字段 | 提案：增加生命周期信号；GET run 返回独立 cleanup 字段。终态关闭 SSE 后可通过 GET 查询清理结果 | B1 提案，C/A 联调前确认 payload、事件顺序和失效 URL 不再补发规则 |
 | U3 | RunMode 没有 MOCK；合成事件既不是真实浏览，也不是已录制 REPLAY | mock 默认只用于自动化测试/内部 harness；不通过产品接口伪装 LIVE 或 REPLAY | 若要 A 通过真实 HTTP 演示合成数据，先与 A/C/D 确认开发标记、schema 影响和 UI 文案 |
-| U4 | 项目后端实际用哪个 OpenAI 模型、额度和模型权限 | `OPENAI_MODEL` 外部配置；不写死未知模型，不自动替换 | B4 真实调用前由用户/团队选定可用模型；离线工作不受阻 |
+| U4 | 用户已指定项目后端使用 `gpt-5-mini`；2026-09-12 已用 synthetic registry 完成一次极短 Responses API 结构化规划 smoke | `OPENAI_MODEL=gpt-5-mini` 外部配置，不在源码写死 | 模型选择和当前 key 的基本模型权限已验证；额度持续性仍由账户状态决定，后续失败时保留离线路径并报告实际错误 |
 | U5 | 原包未精确定义澄清是否计入 90 秒、清理的额外宽限时间 | 提案：90 秒累计活动处理时间，needs_input 独立 5 分钟；清理独立有界等待 | B3 前 B/C 确认并记录，不把这项解释称为原文要求 |
 | U6 | D 抛 MODEL_FAILED 时，如何用现有 AnswerBundle 显示已读原文卡，原包未给完整降级形状 | B 发稳定错误和真实已有过程事件；可验证部分 bundle 由 D 生成 | 与 D/A 确认原文 fallback bundle；未完成则不得宣称已支持该降级 |
 | U7 | 学校已确认为 UTSG，面向各学院全体学生；具体演示活动/课程、公开页面与云端 fixture 地址尚未选定 | 按 UTSG 范围消费 D 的 registry；开发用本地快照测试，不编造已访问站点 | 一旦需要确定演示对象或来源范围就及时问用户；B5 前由 D 选来源、C 验证；fixture 托管执行人和地址由团队确定 |

@@ -31,7 +31,8 @@ export type RunPlanner = (
   runId: string,
   input: QueryInput,
   sources: SourceConfig[],
-) => QueryPlan | ClarificationPlan;
+  signal: AbortSignal,
+) => QueryPlan | ClarificationPlan | Promise<QueryPlan | ClarificationPlan>;
 
 class ExecutionTimeoutError extends Error {
   constructor() {
@@ -88,7 +89,10 @@ export class RunExecutor {
     try {
       this.#runStore.transition(runId, "planning");
       const input = this.#runStore.getInput(runId);
-      const planningResult = this.#planRun(runId, input, this.#sources);
+      const planningResult = await this.#withAbort(
+        Promise.resolve(this.#planRun(runId, input, this.#sources, controller.signal)),
+        controller.signal,
+      );
       if ("question" in planningResult) {
         this.#runStore.transition(runId, "needs_input");
         this.#runStore.appendEvent(runId, "clarification_needed", planningResult);
