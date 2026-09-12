@@ -4,11 +4,17 @@ import { describe, expect, it } from "vitest";
 
 import {
   AnswerBundleSchema,
+  ApiErrorSchema,
   BrowserBatchSchema,
+  CancelRunResponseSchema,
+  ClarificationRequestSchema,
+  CreateRunResponseSchema,
   EventEnvelopeSchema,
   PageSnapshotSchema,
   QueryInputSchema,
   QueryPlanSchema,
+  RunSnapshotSchema,
+  SourcesResponseSchema,
 } from "../src/index.js";
 
 async function readExample(name: string): Promise<unknown> {
@@ -80,6 +86,44 @@ describe("boundary rejection", () => {
         type: "run_status",
         payload: { code: "TIMEOUT", message: "Timed out", retryable: true },
       }),
+    ).toThrow();
+  });
+});
+
+describe("HTTP boundary schemas", () => {
+  it("validates the documented API response shapes", () => {
+    CreateRunResponseSchema.parse({
+      runId: "run-1",
+      eventsUrl: "/api/runs/run-1/events",
+      status: "queued",
+    });
+    RunSnapshotSchema.parse({
+      runId: "run-1",
+      status: "queued",
+      answer: null,
+      lastSeq: 1,
+    });
+    ClarificationRequestSchema.parse({
+      scopePatch: { term: "Fall 2026" },
+      answer: "Fall 2026",
+    });
+    CancelRunResponseSchema.parse({ runId: "run-1", status: "cancelled" });
+    ApiErrorSchema.parse({
+      error: { code: "RUN_NOT_FOUND", message: "Run not found." },
+    });
+  });
+
+  it("prevents the source list from leaking entry URLs or configuration", () => {
+    expect(() =>
+      SourcesResponseSchema.parse([
+        {
+          id: "source-1",
+          label: "Example source",
+          kind: "official",
+          access: "public",
+          entryUrl: "https://example.edu/private-entry",
+        },
+      ]),
     ).toThrow();
   });
 });

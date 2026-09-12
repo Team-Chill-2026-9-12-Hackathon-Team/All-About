@@ -227,6 +227,45 @@ export const RunStatusSchema = z.enum([
   "cancelled",
 ]);
 
+export const SourceSummarySchema = SourceConfigSchema.pick({
+  id: true,
+  label: true,
+  kind: true,
+  access: true,
+});
+
+export const SourcesResponseSchema = z.array(SourceSummarySchema);
+
+export const CreateRunResponseSchema = z.strictObject({
+  runId: identifierSchema,
+  eventsUrl: z.string().startsWith("/api/runs/"),
+  status: z.literal("queued"),
+});
+
+export const RunSnapshotSchema = z.strictObject({
+  runId: identifierSchema,
+  status: RunStatusSchema,
+  answer: AnswerBundleSchema.nullable(),
+  lastSeq: z.number().int().nonnegative(),
+});
+
+export const ClarificationRequestSchema = z.strictObject({
+  scopePatch: ScopeSchema.partial(),
+  answer: z.string().trim().min(1),
+});
+
+export const CancelRunResponseSchema = z.strictObject({
+  runId: identifierSchema,
+  status: RunStatusSchema,
+});
+
+export const ApiErrorSchema = z.strictObject({
+  error: z.strictObject({
+    code: z.string().trim().min(1),
+    message: z.string().trim().min(1),
+  }),
+});
+
 const eventBaseShape = {
   schemaVersion: SchemaVersionSchema,
   runId: identifierSchema,

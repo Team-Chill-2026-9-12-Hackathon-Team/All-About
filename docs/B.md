@@ -14,6 +14,7 @@
 - B1 契约草案：用 Zod 落地 Scope、QueryInput/Plan、Source、Snapshot、BrowserBatch、Claim/Evidence/AnswerBundle、RunStatus 和按 type 判别的 EventEnvelope；TypeScript 类型从 schema 推导。
 - 为 A/C/D 提供 query input、query plan、browser batch、answer bundle 和事件 JSON 样例；课程材料明确标为虚构 fixture。
 - 契约 README 记录边界和三项待确认扩展：cleanup 生命周期、开发 mock 模式、faculty/college scope 字段。当前实现严格遵循原始 v1 草案，尚未宣称团队已冻结。
+- B2 契约切片：增加来源列表、创建任务、任务快照、澄清、取消和统一错误的 HTTP 边界 schema；来源公开摘要严格排除入口 URL 和其他配置。
 
 ## 验证与同步
 
@@ -27,6 +28,7 @@
 - 工程骨架通过 server/contracts TypeScript 检查；Vitest 已能启动，但此切片尚无测试文件，测试命令按预期以“无测试文件”退出，不能记作测试通过。
 - 后端配置与健康接口通过 TypeScript 检查和 4 个 Vitest 测试；真实启动烟测访问 `http://127.0.0.1:3001/api/health` 得到 `{ok:true}`。
 - 根级 `npm run typecheck` 通过；根级 `npm test` 通过，共 3 个测试文件、9 个测试。B1 测试覆盖五份共享样例和三类非法边界输入。
+- B2 HTTP schema 的 contracts 类型检查通过；contracts 当前 7 个测试通过。完整根级检查在 API/RunStore 切片完成后重跑。
 
 ## 当前边界
 
@@ -35,4 +37,4 @@
 - 真实密钥已安全复制到此 checkout 的 `.env`，该文件被 Git 忽略；未输出或暂存密钥。
 - 当前 Codex 运行环境能运行 Node，但没有全局 `npm` 命令；通过临时 npm 12.0.2 完成依赖安装。团队普通 Node/npm 环境可直接使用锁文件；本地后续检查可直接调用已安装工具。
 - 正常团队命令：`npm install`、`npm run dev:server`、`npm run typecheck`、`npm test`。当前 Codex 终端的验证使用锁文件中相同工具直接执行，并额外完成真实服务烟测。
-- 下一步：提交并同步 B1 草案，向团队确认契约扩展；确认后完成 B1 冻结记录，再进入 B2。具体演示课程/活动尚未选定，推进到依赖该选择的步骤时及时问用户。
+- 下一步：实现内存 RunStore、任务 HTTP 接口和 SSE 历史补发。具体演示课程/活动尚未选定，推进到依赖该选择的步骤时及时问用户。
