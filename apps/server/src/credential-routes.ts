@@ -69,7 +69,11 @@ export function registerCredentialRoutes(
       const parsed = credentialUpdateSchema.safeParse(request.body);
       if (!parsed.success || !request.params.id.trim()) return invalid(reply);
       try {
-        const credential = await vault.update(request.params.id, parsed.data);
+        const credential = await vault.update(request.params.id, {
+          domain: parsed.data.domain,
+          username: parsed.data.username,
+          ...(parsed.data.password === undefined ? {} : { password: parsed.data.password }),
+        });
         return { credential };
       } catch (error) {
         if (error instanceof CredentialNotFoundError) {
