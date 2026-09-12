@@ -9,6 +9,7 @@ import {
   readLinks,
   readVisibleText,
 } from './page-tools.js';
+import { attemptCredentialLogin, type CredentialResolver } from './login.js';
 import type {
   BrowserBatch,
   BrowserSignal,
@@ -20,6 +21,7 @@ import type {
 
 export type * from '@allabout/contracts';
 export { assertAllowedUrl, readLinks, readVisibleText } from './page-tools.js';
+export { attemptCredentialLogin, type CredentialResolver } from './login.js';
 
 const MIN_TEXT_LENGTH = 100;
 const MAX_SESSION_MS = 5 * 60_000;
@@ -28,6 +30,7 @@ export async function collectPages(
   plan: QueryPlan,
   emit: (signal: BrowserSignal) => void,
   signal: AbortSignal,
+  resolveCredential?: CredentialResolver,
 ): Promise<BrowserBatch> {
   QueryPlanSchema.parse(plan);
   validatePlan(plan);
@@ -111,7 +114,7 @@ export async function collectPages(
         try {
           await collectTarget(page, activeTarget, plan, combinedSignal, emit, () => {
             stepCount += 1;
-          }, pages);
+          }, pages, resolveCredential);
           finalFailure = null;
           break;
         } catch (error) {
@@ -189,13 +192,19 @@ async function collectTarget(
   emit: (signal: BrowserSignal) => void,
   countStep: () => void,
   pages: PageSnapshot[],
+  resolveCredential: CredentialResolver | undefined,
 ): Promise<void> {
-  if (target.access !== 'public') {
+  if (target.access === 'unconfigured') {
     throw new BrowserTargetError(
-      target.access === 'authorized' ? 'AUTH_REQUIRED' : 'UNSUPPORTED_SOURCE',
-      target.access === 'authorized'
-        ? 'This source requires a separately authorized browser session.'
-        : 'This source has not been configured for browser access.',
+      'UNSUPPORTED_SOURCE',
+      'This source has not been configured for browser access.',
+      false,
+    );
+  }
+  if (target.access === 'authorized' && resolveCredential === undefined) {
+    throw new BrowserTargetError(
+      'AUTH_REQUIRED',
+      'This source requires a credential saved for its exact login domain.',
       false,
     );
   }
@@ -222,22 +231,42 @@ async function collectTarget(
     .catch(() => undefined);
   throwIfAborted(signal);
 
-  const finalUrl = assertAllowedUrl(page.url(), target.allowedHosts);
-  const body = await page.locator('body').innerText({ timeout: 5_000 });
-  const title = await page.title();
-  const status = response?.status() ?? null;
+  let body = await page.locator('body').innerText({ timeout: 5_000 });
+  let title = await page.title();
+  let status = response?.status() ?? null;
+  let currentUrl = page.url();
 
   if (looksBlocked(status, title, body)) {
     throw new BrowserTargetError('ACCESS_BLOCKED', 'The source returned an access check or block page.', true);
   }
-  if (looksLikeAuthentication(status, finalUrl.href)) {
-    emit({ type: 'step', sourceId: target.id, action: 'hold_for_viewer', url: finalUrl.href });
-    try {
-      await holdForViewer(2_000, signal);
-    } catch {
-      /* still report the login wall */
+
+  if (target.access === 'authorized' || looksLikeAuthentication(status, currentUrl)) {
+    if (resolveCredential === undefined) {
+      throw new BrowserTargetError('AUTH_REQUIRED', 'No credential resolver is configured.', false);
     }
-    throw new BrowserTargetError('AUTH_REQUIRED', 'The source redirected to an authentication page.', false);
+    emit({ type: 'step', sourceId: target.id, action: 'credential_login', url: currentUrl });
+    const login = await attemptCredentialLogin(page, target, resolveCredential, signal);
+    if (login.status !== 'authenticated') {
+      emit({ type: 'step', sourceId: target.id, action: 'hold_for_viewer', url: currentUrl });
+      try {
+        await holdForViewer(2_000, signal);
+      } catch {
+        /* still report the login wall */
+      }
+      const message = login.status === 'credential_missing'
+        ? 'No credential is saved for the exact login domain.'
+        : 'The login form requires manual sign-in, MFA, or a site-specific adapter.';
+      throw new BrowserTargetError('AUTH_REQUIRED', message, false);
+    }
+    currentUrl = login.url;
+    body = await page.locator('body').innerText({ timeout: 5_000 });
+    title = await page.title();
+    status = null;
+  }
+
+  const finalUrl = assertAllowedUrl(currentUrl, target.allowedHosts);
+  if (looksLikeAuthentication(status, finalUrl.href)) {
+    throw new BrowserTargetError('AUTH_REQUIRED', 'The source remained on an authentication page.', false);
   }
   if (status !== null && status >= 400) {
     throw new BrowserTargetError('NAVIGATION_FAILED', `The source returned HTTP ${status}.`, status >= 500);
