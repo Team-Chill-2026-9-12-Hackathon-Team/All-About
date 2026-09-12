@@ -519,3 +519,7 @@ to{opacity:1;transform:translateY(0)}
 
 /* Keep the primary desk side by side. */
 @media(max-width:720px){.workspace{display:grid;grid-template-columns:minmax(280px,.9fr) minmax(320px,1.25fr);height:calc(100vh - 149px);min-height:570px;max-height:1000px}.chat-panel{border-right:1px solid var(--line);border-bottom:0}.chat-body{max-height:none;min-height:0}.browser-panel{min-height:0}}
+
+
+/* Keep sign-in split into its brand and form columns. */
+@media(max-width:800px){.auth-shell{display:grid;grid-template-columns:minmax(300px,43%) minmax(330px,1fr)}.auth-aside{min-height:100vh;padding:42px clamp(26px,5vw,70px)}.auth-copy{margin:70px 0}.auth-copy h1{font-size:clamp(32px,4vw,50px)}.auth-grid{display:grid}.auth-main{min-height:100vh;padding:40px clamp(26px,6vw,90px)}.auth-card{margin:auto}.auth-top{position:static;color:#5c7388}.auth-top>span{display:block}}
