@@ -11,6 +11,9 @@ if (!serverConfig.openAiConfigured) {
     "OPENAI_API_KEY is not configured; health checks and offline tests remain available.",
   );
 }
+app.log.warn(
+  "Run execution is unavailable until a reviewed source registry is configured; POST /api/runs will return 503.",
+);
 
 try {
   await app.listen({ host: serverConfig.host, port: serverConfig.port });

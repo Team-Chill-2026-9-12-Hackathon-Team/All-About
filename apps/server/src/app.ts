@@ -23,6 +23,7 @@ export function buildApp(
   registerRunRoutes(app, {
     runStore,
     sources,
+    executionAvailable: dependencies.runExecutor !== undefined,
     ...(dependencies.runExecutor === undefined
       ? {}
       : {

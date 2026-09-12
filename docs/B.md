@@ -25,6 +25,9 @@
 - 用户已指定应用 API 模型为 `gpt-5-mini`；本地忽略的 `.env` 已设置 `OPENAI_MODEL=gpt-5-mini`。API key 保持原值且未输出、未暂存。
 - 已合入 D 的 `origin/feat/evidence` 并保留其提交历史；删除 D 的临时重复类型，改为直接消费 `@allabout/contracts`，补齐 AnswerBundle 的 mode/scope/requirements/communityNotes/sources，并将 D 包正式链接进 server workspace。
 - 统一 `QueryPlan.requestedFields` 语义为事实字段而非 UI 区块；当前规划 schema 支持 deadline、submission_format、eligibility、location、registration_process、contact、other，D 当前规则提取器已实现前两项，其余会诚实落入 unknown/partial。
+- 已合入 C 的 `@allabout/browser` 公共实现；新增统一 runtime 组合器，将 OpenAI planner、C.collectPages、D.buildAnswer 和 RunExecutor 连接在同一依赖图中。当前本机未配置 Steel key，因此只完成无凭据集成验证，不重复声称 C 的远端真实 smoke 是本机结果。
+- 默认 server 在尚无已审阅 source registry/runtime 时，`POST /api/runs` 明确返回 503 `RUN_EXECUTION_UNAVAILABLE`，不再制造永久 queued 的任务；健康检查仍可用。
+- 按用户此前“不得包含本对话外内容”的要求，合并远端后删除了 `CURSOR_CONVERSATION_HISTORY.md` 与 `PROJECT_MEMO.md`；这两份外部会话交接仍可从 Git 历史恢复，但不会进入本分支当前树。
 
 ## 验证与同步
 
@@ -50,12 +53,15 @@
 - 根 npm workspace 明确限定为 `apps/server` 与 `packages/*`，避免 npm 改写 A 的独立 pnpm 前端；根 Vitest 配置排除 `apps/web` 的 Node test，防止两种测试运行器互相误收集。是否最终统一包管理器仍需团队决定。
 - D 适配后严格 TypeScript 检查、6 个原有 Node tests 和 synthetic smoke 均通过。新增 1 个 B→D 集成测试：B 执行器调用 D 的真实 buildAnswer，答案经过 B 引用校验后进入 completed。
 - 当前根级 `npm test` 通过：server 41、contracts 7、evidence 6，共 54 个测试；另有 A 前端 6 个独立 Node tests 及 production build 通过。`gpt-5-mini` 在事实字段 schema 更新后再次通过最小真实规划 smoke。
+- C 依赖安装后，browser 严格 TypeScript 检查和 3 个无凭据测试通过，覆盖 exact-host HTTPS 白名单、阻断/登录识别及预取消不创建 Steel session。B runtime/503 专项测试通过。
+- 合并 C/D 与 runtime 后，根级 `npm run typecheck` 通过；根级 `npm test` 通过，共 server 42、browser 3、contracts 7、evidence 6，即 58 个测试。A 的 6 个前端 Node tests 与 production build 继续独立验证。
+- `docs/B_CONTRACT_PROPOSALS.md` 已记录 authority、cleanup/viewer 生命周期与事实字段语义的共享契约提案；未收到 A/C/D 回复前不宣称冻结。
 
 ## 当前边界
 
-- B0 本地实现已完成；B1 v1 契约草案已实现并通过测试，D 已在 B 集成分支完成类型适配，仍等待 A/C 的正式评审后才可标记冻结。C 尚未接入；B→D 仅以 synthetic BrowserBatch 验证，暂无真实浏览端到端结果。
+- B0 本地实现已完成；B1 v1 契约草案已实现并通过测试，C/D 已在 B 集成分支消费共享契约，仍等待 A 的正式评审后才可标记冻结。通用 C/D runtime 已接线；本机缺少 Steel key 和已确认的真实 source registry，暂无本机真实浏览端到端结果。
 - 实际 Git checkout：`C:\Users\xuziq\Desktop\hackthon\work\github-sync`。
 - 真实密钥已安全复制到此 checkout 的 `.env`，该文件被 Git 忽略；未输出或暂存密钥。
 - 当前 Codex 运行环境能运行 Node，但没有全局 `npm` 命令；通过临时 npm 12.0.2 完成依赖安装。团队普通 Node/npm 环境可直接使用锁文件；本地后续检查可直接调用已安装工具。
 - 正常团队命令：`npm install`、`npm run dev:server`、`npm run typecheck`、`npm test`。当前 Codex 终端的验证使用锁文件中相同工具直接执行，并额外完成真实服务烟测。
-- 下一步：在 C 尚未交付时先修复默认 server 缺少执行依赖却接受 POST 后永久 queued 的行为，并形成 authority/cleanup 契约提案；真实浏览集成仍等待 C 分支。具体演示课程/活动尚未选定，推进到依赖该选择的步骤时及时问用户。
+- 下一步：等待用户确认首个真实 demo 与提供 Steel key 文件路径；同时形成 authority/cleanup 契约提案并完成无凭据失败路径。拿到凭据后再做本机真实 C→D 端到端。当前建议 demo 为面向 UTSG 全体学生的 Xplore Hart House 活动。

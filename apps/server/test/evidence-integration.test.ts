@@ -1,8 +1,7 @@
 import type { QueryInput, QueryPlan, SourceConfig } from "@allabout/contracts";
-import { buildAnswer } from "@allabout/evidence";
 import { describe, expect, it } from "vitest";
 
-import { RunExecutor } from "../src/run-executor.js";
+import { createRunRuntime } from "../src/runtime.js";
 import { RunStore } from "../src/run-store.js";
 import { createMockCollectPages } from "./mock-adapters.js";
 
@@ -52,9 +51,9 @@ describe("B to D evidence integration", () => {
       requestedFields: ["deadline"],
       budget: { maxPages: 3, maxSteps: 6, timeoutMs: 90_000 },
     });
-    const executor = new RunExecutor({
-      runStore: store,
+    const runtime = createRunRuntime({
       sources: [source],
+      runStore: store,
       planRun,
       collectPages: createMockCollectPages((_plan, batch) => ({
         ...batch,
@@ -63,10 +62,9 @@ describe("B to D evidence integration", () => {
           text: "Registration closes on September 20, 2026.",
         })),
       })),
-      buildAnswer,
     });
 
-    executor.start("run-evidence");
+    runtime.runExecutor.start("run-evidence");
     const snapshot = await waitForTerminal(store);
 
     expect(snapshot.status).toBe("completed");

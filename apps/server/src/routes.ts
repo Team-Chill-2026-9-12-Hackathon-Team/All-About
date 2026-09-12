@@ -25,6 +25,7 @@ import {
 interface RunRoutesDependencies {
   runStore: RunStore;
   sources: SourceConfig[];
+  executionAvailable: boolean;
   onRunCreated?: (runId: string) => void;
   onRunClarified?: (runId: string) => void;
   cancelRun?: (runId: string) => RunSnapshot;
@@ -113,6 +114,14 @@ export function registerRunRoutes(
         400,
         "INVALID_QUERY_INPUT",
         "The query input does not match the shared contract.",
+      );
+    }
+    if (!dependencies.executionAvailable) {
+      return sendError(
+        reply,
+        503,
+        "RUN_EXECUTION_UNAVAILABLE",
+        "Run execution is not configured on this server.",
       );
     }
 

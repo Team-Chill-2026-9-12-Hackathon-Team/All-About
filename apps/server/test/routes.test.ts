@@ -36,6 +36,20 @@ function createStore() {
   });
 }
 
+function buildRouteApp(store = createStore(), sources: SourceConfig[] = []) {
+  return buildApp(
+    {},
+    {
+      runStore: store,
+      sources,
+      runExecutor: {
+        start: () => undefined,
+        cancel: (runId) => store.cancel(runId),
+      },
+    },
+  );
+}
+
 function parseSse(body: string) {
   return body
     .split("\n\n")
@@ -55,8 +69,23 @@ afterEach(async () => {
 });
 
 describe("run HTTP API", () => {
+  it("returns 503 instead of leaving a run queued when execution is unavailable", async () => {
+    const app = buildApp();
+    apps.push(app);
+
+    const response = await app.inject({ method: "POST", url: "/api/runs", payload: input });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({
+      error: {
+        code: "RUN_EXECUTION_UNAVAILABLE",
+        message: "Run execution is not configured on this server.",
+      },
+    });
+  });
+
   it("lists only public source summary fields", async () => {
-    const app = buildApp({}, { runStore: createStore(), sources: [source] });
+    const app = buildRouteApp(createStore(), [source]);
     apps.push(app);
 
     const response = await app.inject({ method: "GET", url: "/api/sources" });
@@ -73,7 +102,7 @@ describe("run HTTP API", () => {
   });
 
   it("creates a queued run and makes it recoverable by ID", async () => {
-    const app = buildApp({}, { runStore: createStore() });
+    const app = buildRouteApp();
     apps.push(app);
 
     const created = await app.inject({ method: "POST", url: "/api/runs", payload: input });
@@ -95,7 +124,7 @@ describe("run HTTP API", () => {
   });
 
   it("rejects invalid input, unknown runs, and a second active run", async () => {
-    const app = buildApp({}, { runStore: createStore() });
+    const app = buildRouteApp();
     apps.push(app);
 
     const invalid = await app.inject({
@@ -118,7 +147,7 @@ describe("run HTTP API", () => {
     store.create(input);
     store.transition("run-1", "planning");
     store.transition("run-1", "needs_input");
-    const app = buildApp({}, { runStore: store });
+    const app = buildRouteApp(store);
     apps.push(app);
 
     const clarified = await app.inject({
@@ -139,7 +168,7 @@ describe("run HTTP API", () => {
   });
 
   it("cancels idempotently and permits a new run", async () => {
-    const app = buildApp({}, { runStore: createStore() });
+    const app = buildRouteApp();
     apps.push(app);
     await app.inject({ method: "POST", url: "/api/runs", payload: input });
 
@@ -168,7 +197,7 @@ describe("run event stream", () => {
     const store = createStore();
     store.create(input);
     store.cancel("run-1");
-    const app = buildApp({}, { runStore: store });
+    const app = buildRouteApp(store);
     apps.push(app);
 
     const response = await app.inject({ method: "GET", url: "/api/runs/run-1/events" });
@@ -186,7 +215,7 @@ describe("run event stream", () => {
     const store = createStore();
     store.create(input);
     store.cancel("run-1");
-    const app = buildApp({}, { runStore: store });
+    const app = buildRouteApp(store);
     apps.push(app);
 
     const response = await app.inject({
@@ -202,7 +231,7 @@ describe("run event stream", () => {
     const store = createStore();
     store.create(input);
     store.cancel("run-1");
-    const app = buildApp({}, { runStore: store });
+    const app = buildRouteApp(store);
     apps.push(app);
 
     const crossRun = await app.inject({
