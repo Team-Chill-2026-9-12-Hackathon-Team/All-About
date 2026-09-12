@@ -12,7 +12,7 @@ function dateKey(claim: Claim): string | null {
 function isExplicitUpdate(claim: Claim, evidenceById: Map<string, Evidence>): boolean {
   return claim.evidenceIds.some((id) => {
     const item = evidenceById.get(id);
-    if (!item || !["institution", "instructor", "ta"].includes(item.authority)) return false;
+    if (!item || item.authority !== "instructor") return false;
     return /\b(?:extend(?:ed)?|postpone(?:d)?|reschedule(?:d)?|moved?\s+to|new deadline)\b/i.test(item.quote);
   });
 }
@@ -65,14 +65,17 @@ export function resolveConflicts(
   }
 
   const keyDates: KeyDate[] = resolved
-    .filter((claim) => claim.dateValue && claim.status !== "superseded")
+    .filter((claim) => claim.dateValue && claim.nature === "fact" && claim.status !== "superseded")
     .map((claim, index) => ({
       id: `key-date-${index + 1}`,
       label: claim.field,
       value: claim.dateValue!,
       claimId: claim.id,
       evidenceIds: claim.evidenceIds,
-      status: claim.status === "supported" ? "confirmed" : "needs_confirmation",
+      status: claim.status === "supported" && claim.dateValue!.precision !== "unknown" && claim.evidenceIds.some((id) => {
+        const authority = evidenceById.get(id)?.authority;
+        return authority === "institution" || authority === "instructor" || authority === "ta";
+      }) ? "confirmed" : "needs_confirmation",
     }));
 
   return { claims: resolved, conflicts, keyDates };

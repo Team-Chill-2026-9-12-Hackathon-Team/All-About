@@ -1,0 +1,189 @@
+{
+  "schemaVersion": "1",
+  "runId": "sample-conflict",
+  "mode": "LIVE_FIXTURE",
+  "scope": {
+    "school": "University of Toronto",
+    "campus": "St. George",
+    "term": "Fall 2026",
+    "course": null,
+    "section": null,
+    "entity": "Demo data · Fictional activity"
+  },
+  "summary": [],
+  "requirements": [],
+  "communityNotes": [],
+  "unknowns": [
+    "Conflicting event_date values require confirmation from an authoritative source."
+  ],
+  "claims": [
+    {
+      "id": "claim-1",
+      "field": "event_date",
+      "text": "Event date: September 24, 2026.",
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George",
+        "term": "Fall 2026",
+        "course": null,
+        "section": null,
+        "entity": "Demo data · Fictional activity"
+      },
+      "nature": "fact",
+      "status": "conflict",
+      "evidenceIds": [
+        "evidence-1"
+      ],
+      "dateValue": {
+        "precision": "date",
+        "date": "2026-09-24",
+        "timezone": null
+      }
+    },
+    {
+      "id": "claim-2",
+      "field": "event_date",
+      "text": "Event date: September 25, 2026.",
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George",
+        "term": "Fall 2026",
+        "course": null,
+        "section": null,
+        "entity": "Demo data · Fictional activity"
+      },
+      "nature": "fact",
+      "status": "conflict",
+      "evidenceIds": [
+        "evidence-2"
+      ],
+      "dateValue": {
+        "precision": "date",
+        "date": "2026-09-25",
+        "timezone": null
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "evidence-1",
+      "snapshotId": "list",
+      "quote": "Event date: September 24, 2026.",
+      "authority": "institution",
+      "authorityBasis": "Source is registered as official"
+    },
+    {
+      "id": "evidence-2",
+      "snapshotId": "detail",
+      "quote": "Event date: September 25, 2026.",
+      "authority": "institution",
+      "authorityBasis": "Source is registered as official"
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "conflict-1",
+      "claimIds": [
+        "claim-1",
+        "claim-2"
+      ],
+      "field": "event_date",
+      "resolution": "unresolved",
+      "selectedClaimId": null,
+      "explanation": "The sources disagree and no explicit update relationship was found.",
+      "evidenceIds": [
+        "evidence-1",
+        "evidence-2"
+      ]
+    }
+  ],
+  "keyDates": [
+    {
+      "id": "key-date-1",
+      "label": "event_date",
+      "value": {
+        "precision": "date",
+        "date": "2026-09-24",
+        "timezone": null
+      },
+      "claimId": "claim-1",
+      "evidenceIds": [
+        "evidence-1"
+      ],
+      "status": "needs_confirmation"
+    },
+    {
+      "id": "key-date-2",
+      "label": "event_date",
+      "value": {
+        "precision": "date",
+        "date": "2026-09-25",
+        "timezone": null
+      },
+      "claimId": "claim-2",
+      "evidenceIds": [
+        "evidence-2"
+      ],
+      "status": "needs_confirmation"
+    }
+  ],
+  "coverage": [
+    {
+      "sourceId": "event-list",
+      "status": "checked",
+      "reason": null,
+      "snapshotIds": [
+        "list"
+      ]
+    },
+    {
+      "sourceId": "event-detail",
+      "status": "checked",
+      "reason": null,
+      "snapshotIds": [
+        "detail"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "list",
+      "sourceId": "event-list",
+      "url": "https://example.com/event-list",
+      "title": "Demo data · Fictional activity",
+      "fetchedAt": "2026-09-12T12:00:00-04:00",
+      "publishedAt": null,
+      "updatedAt": null,
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George",
+        "term": "Fall 2026",
+        "course": null,
+        "section": null,
+        "entity": "Demo data · Fictional activity"
+      },
+      "kind": "official",
+      "contentMode": "fixture"
+    },
+    {
+      "id": "detail",
+      "sourceId": "event-detail",
+      "url": "https://example.com/event-detail",
+      "title": "Demo data · Fictional activity",
+      "fetchedAt": "2026-09-12T12:00:00-04:00",
+      "publishedAt": null,
+      "updatedAt": null,
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George",
+        "term": "Fall 2026",
+        "course": null,
+        "section": null,
+        "entity": "Demo data · Fictional activity"
+      },
+      "kind": "official",
+      "contentMode": "fixture"
+    }
+  ],
+  "generatedAt": "2026-09-12T19:12:24.651Z"
+}

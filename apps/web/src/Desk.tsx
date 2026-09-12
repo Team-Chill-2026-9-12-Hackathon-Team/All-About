@@ -834,7 +834,6 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
         <span>ALLABOUT CAMPUS</span>
         <span>Made for the questions between classes.</span>
       </footer>
-      <VaultDrawer open={vaultOpen} onClose={() => setVaultOpen(false)} />
       {drawer && (
         <div className="drawer-backdrop" onClick={() => setDrawer(false)}>
           <aside ref={dialog} className="history-drawer" role="dialog" aria-modal="true" aria-labelledby="history-heading" onClick={(e) => e.stopPropagation()}>

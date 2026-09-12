@@ -9,6 +9,7 @@ export type ExtractedCandidate = {
   authority: Authority;
   authorityBasis: string | null;
   dateRaw?: string;
+  dedupeValue?: string;
 };
 
 export interface CandidateExtractor {

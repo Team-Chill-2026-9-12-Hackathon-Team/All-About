@@ -1,0 +1,183 @@
+{
+  "schemaVersion": "1",
+  "runId": "sample-extension",
+  "mode": "LIVE_FIXTURE",
+  "scope": {
+    "school": "University of Toronto",
+    "campus": "St. George",
+    "term": "Fall 2026",
+    "course": null,
+    "section": null,
+    "entity": "Demo data · Fictional activity"
+  },
+  "summary": [
+    {
+      "text": "The registration deadline has been extended to September 20, 2026.",
+      "claimIds": [
+        "claim-2"
+      ],
+      "evidenceIds": [
+        "evidence-2"
+      ]
+    }
+  ],
+  "requirements": [],
+  "communityNotes": [],
+  "unknowns": [],
+  "claims": [
+    {
+      "id": "claim-1",
+      "field": "deadline",
+      "text": "Registration deadline is September 18, 2026.",
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George",
+        "term": "Fall 2026",
+        "course": null,
+        "section": null,
+        "entity": "Demo data · Fictional activity"
+      },
+      "nature": "fact",
+      "status": "superseded",
+      "evidenceIds": [
+        "evidence-1"
+      ],
+      "dateValue": {
+        "precision": "date",
+        "date": "2026-09-18",
+        "timezone": null
+      }
+    },
+    {
+      "id": "claim-2",
+      "field": "deadline",
+      "text": "The registration deadline has been extended to September 20, 2026.",
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George",
+        "term": "Fall 2026",
+        "course": null,
+        "section": null,
+        "entity": "Demo data · Fictional activity"
+      },
+      "nature": "fact",
+      "status": "supported",
+      "evidenceIds": [
+        "evidence-2"
+      ],
+      "dateValue": {
+        "precision": "date",
+        "date": "2026-09-20",
+        "timezone": null
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "evidence-1",
+      "snapshotId": "old",
+      "quote": "Registration deadline is September 18, 2026.",
+      "authority": "institution",
+      "authorityBasis": "Fixture source registry"
+    },
+    {
+      "id": "evidence-2",
+      "snapshotId": "new",
+      "quote": "The registration deadline has been extended to September 20, 2026.",
+      "authority": "instructor",
+      "authorityBasis": "Fixture source registry"
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "conflict-1",
+      "claimIds": [
+        "claim-1",
+        "claim-2"
+      ],
+      "field": "deadline",
+      "resolution": "explicit_update",
+      "selectedClaimId": "claim-2",
+      "explanation": "A supported source explicitly states that the earlier value was updated.",
+      "evidenceIds": [
+        "evidence-1",
+        "evidence-2"
+      ]
+    }
+  ],
+  "keyDates": [
+    {
+      "id": "key-date-1",
+      "label": "deadline",
+      "value": {
+        "precision": "date",
+        "date": "2026-09-20",
+        "timezone": null
+      },
+      "claimId": "claim-2",
+      "evidenceIds": [
+        "evidence-2"
+      ],
+      "status": "confirmed"
+    }
+  ],
+  "coverage": [
+    {
+      "sourceId": "demo101-syllabus",
+      "status": "checked",
+      "reason": null,
+      "snapshotIds": [
+        "old"
+      ]
+    },
+    {
+      "sourceId": "demo101-instructor",
+      "status": "checked",
+      "reason": null,
+      "snapshotIds": [
+        "new"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "old",
+      "sourceId": "demo101-syllabus",
+      "url": "https://example.com/demo101-syllabus",
+      "title": "Demo data · Fictional activity",
+      "fetchedAt": "2026-09-12T12:00:00-04:00",
+      "publishedAt": null,
+      "updatedAt": null,
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George",
+        "term": "Fall 2026",
+        "course": null,
+        "section": null,
+        "entity": "Demo data · Fictional activity"
+      },
+      "kind": "official",
+      "contentMode": "fixture"
+    },
+    {
+      "id": "new",
+      "sourceId": "demo101-instructor",
+      "url": "https://example.com/demo101-instructor",
+      "title": "Demo data · Fictional activity",
+      "fetchedAt": "2026-09-12T12:00:00-04:00",
+      "publishedAt": null,
+      "updatedAt": null,
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George",
+        "term": "Fall 2026",
+        "course": null,
+        "section": null,
+        "entity": "Demo data · Fictional activity"
+      },
+      "kind": "official",
+      "contentMode": "fixture"
+    }
+  ],
+  "generatedAt": "2026-09-12T19:12:24.651Z"
+}

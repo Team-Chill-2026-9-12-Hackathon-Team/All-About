@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "1",
+  "runId": "sample-missing",
+  "mode": "LIVE_FIXTURE",
+  "scope": {
+    "school": "University of Toronto",
+    "campus": "St. George",
+    "term": "Fall 2026",
+    "course": null,
+    "section": null,
+    "entity": "Demo data · Fictional activity"
+  },
+  "summary": [],
+  "requirements": [
+    {
+      "text": "Requirements: Participants must bring a valid TCard.",
+      "claimIds": [
+        "claim-1"
+      ],
+      "evidenceIds": [
+        "evidence-1"
+      ]
+    }
+  ],
+  "communityNotes": [],
+  "unknowns": [
+    "The checked sources did not provide eligibility for Demo data · Fictional activity."
+  ],
+  "claims": [
+    {
+      "id": "claim-1",
+      "field": "requirements",
+      "text": "Requirements: Participants must bring a valid TCard.",
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George",
+        "term": "Fall 2026",
+        "course": null,
+        "section": null,
+        "entity": "Demo data · Fictional activity"
+      },
+      "nature": "fact",
+      "status": "supported",
+      "evidenceIds": [
+        "evidence-1"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "evidence-1",
+      "snapshotId": "requirements",
+      "quote": "Requirements: Participants must bring a valid TCard.",
+      "authority": "institution",
+      "authorityBasis": "Source is registered as official"
+    }
+  ],
+  "conflicts": [],
+  "keyDates": [],
+  "coverage": [
+    {
+      "sourceId": "requirements-page",
+      "status": "checked",
+      "reason": null,
+      "snapshotIds": [
+        "requirements"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "requirements",
+      "sourceId": "requirements-page",
+      "url": "https://example.com/requirements-page",
+      "title": "Demo data · Fictional activity",
+      "fetchedAt": "2026-09-12T12:00:00-04:00",
+      "publishedAt": null,
+      "updatedAt": null,
+      "scope": {
+        "school": "University of Toronto",
+        "campus": "St. George",
+        "term": "Fall 2026",
+        "course": null,
+        "section": null,
+        "entity": "Demo data · Fictional activity"
+      },
+      "kind": "official",
+      "contentMode": "fixture"
+    }
+  ],
+  "generatedAt": "2026-09-12T19:12:24.652Z"
+}

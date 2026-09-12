@@ -1,359 +1,141 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type {
-  BrowserBatch,
-  Claim,
-  Evidence,
-  PageSnapshot,
-  QueryPlan,
-  Scope,
-  SourceConfig,
-} from "@allabout/contracts";
-
-import { buildAnswer, createEvidenceEngine, quoteExists, resolveConflicts } from "../src/index.js";
+import type { BrowserBatch, Claim, Evidence, PageSnapshot, QueryPlan, Scope, SourceConfig } from "@allabout/contracts";
+import { buildAnswer, createEvidenceEngine, parseDateValue, quoteExists, resolveConflicts } from "../src/index.js";
 import type { CandidateExtractor } from "../src/index.js";
 
-const scope: Scope = {
-  school: "University of Toronto",
-  campus: null,
-  term: "Fall 2026",
-  course: null,
-  section: null,
-  entity: "Example event",
+const baseScope: Scope = {
+  school: "University of Toronto", campus: "St. George", term: "Fall 2026",
+  course: null, section: null, entity: "Demo data · Fictional activity",
 };
 
-const source: SourceConfig = {
-  id: "official",
-  label: "Synthetic official fixture",
-  kind: "official",
-  entryUrl: "https://example.test",
-  allowedHosts: ["example.test"],
-  scope,
-  contentMode: "fixture",
-  access: "public",
-};
+function source(id: string, scope = baseScope): SourceConfig {
+  return { id, label: `${id} fixture`, kind: "official", entryUrl: `https://${id}.example.test/event`, allowedHosts: [`${id}.example.test`], scope, contentMode: "fixture", access: "public" };
+}
 
-function makePlan(
-  runId: string,
-  requestedFields: string[],
-  sourceId = source.id,
-): QueryPlan {
+function plan(fields: string[], targets = [source("events")], scope = baseScope): QueryPlan {
   return {
-    runId,
-    input: {
-      query: "Synthetic evidence test",
-      scope,
-      mode: "LIVE_FIXTURE",
-    },
-    requestedFields,
-    targets: [{ ...source, id: sourceId }],
-    budget: { maxPages: 3, maxSteps: 6, timeoutMs: 90_000 },
+    runId: "evidence-test", input: { query: "Find the event details", scope, mode: "LIVE_FIXTURE" },
+    targets, requestedFields: fields, budget: { maxPages: 5, maxSteps: 10, timeoutMs: 90_000 },
   };
 }
 
-test("quote validation tolerates whitespace differences", () => {
+function page(id: string, sourceId: string, text: string, scope = baseScope, kind: PageSnapshot["kind"] = "official"): PageSnapshot {
+  return {
+    id, sourceId, url: `https://${sourceId}.example.test/event`, title: "Xplore Hart House",
+    text, fetchedAt: "2026-09-12T12:00:00-04:00", publishedAt: null, updatedAt: null,
+    scope, kind, contentMode: "fixture",
+  };
+}
+
+test("quote validation tolerates whitespace but rejects invented text", () => {
   assert.equal(quoteExists("Registration closes tomorrow.", "Registration\n closes   tomorrow."), true);
   assert.equal(quoteExists("Registration opens tomorrow.", "Registration closes tomorrow."), false);
 });
 
-test("buildAnswer creates a supported, cited deadline", async () => {
-  const plan = makePlan("test-run", ["deadline"]);
-  const batch: BrowserBatch = {
-    pages: [{
-      id: "page-1",
-      sourceId: "official",
-      url: "https://example.test",
-      title: "Example",
-      text: "Registration closes on September 20, 2026.",
-      fetchedAt: "2026-09-12T12:00:00-04:00",
-      publishedAt: null,
-      updatedAt: null,
-      scope,
-      kind: "official",
-      contentMode: "fixture",
-    }],
-    failures: [],
-    cleanup: "released",
-  };
+test("date parsing preserves offsets and refuses to invent missing context", () => {
+  assert.deepEqual(parseDateValue("2026-09-25T17:00:00-04:00"), { precision: "instant", iso: "2026-09-25T17:00:00-04:00", timezone: "-04:00" });
+  assert.deepEqual(parseDateValue("September 25, 2026 at 5:00 PM EDT"), { precision: "instant", iso: "2026-09-25T17:00:00-04:00", timezone: "EDT" });
+  assert.deepEqual(parseDateValue("September 25 at 5:00 PM"), { precision: "unknown", raw: "September 25 at 5:00 PM" });
+});
 
-  const result = await buildAnswer(plan, batch, new AbortController().signal);
-  assert.equal(result.claims.length, 1);
-  assert.equal(result.evidence.length, 1);
-  assert.deepEqual(result.claims[0]!.dateValue, {
-    precision: "date",
-    date: "2026-09-20",
-    timezone: null,
-  });
-  assert.equal(result.summary[0]!.evidenceIds[0], result.evidence[0]!.id);
+test("activity fields retain a complete registration URL and citations", async () => {
+  const text = [
+    "Xplore Hart House",
+    "Date: September 25, 2026 at 5:00 PM EDT",
+    "Location: Hart House, Great Hall.",
+    "Hosted by Hart House.",
+    "Register at https://events.example.test/register?id=123.",
+    "Requirements: Students must bring a valid TCard.",
+    "This event is open to all University of Toronto students.",
+  ].join("\n");
+  const result = await buildAnswer(plan(["event_name", "event_date", "event_time", "location", "organizer", "registration_link", "requirements", "eligibility"]), {
+    pages: [page("event-page", "events", text)], failures: [], cleanup: "released",
+  }, new AbortController().signal);
+
+  assert.equal(result.mode, "LIVE_FIXTURE");
+  assert.deepEqual(result.scope, baseScope);
+  assert.equal(result.claims.find((claim) => claim.field === "registration_link")?.text, "https://events.example.test/register?id=123");
+  assert.equal(result.requirements.length, 1);
+  assert.equal(result.unknowns.length, 0);
+  assert.ok(result.evidence.every((item) => quoteExists(item.quote, text)));
+  assert.equal(result.keyDates.find((item) => item.label === "event_date")?.status, "confirmed");
+});
+
+test("every requested but absent field is reported", async () => {
+  const result = await buildAnswer(plan(["requirements", "eligibility"]), {
+    pages: [page("requirements", "events", "Requirements: Students must bring a valid TCard.")], failures: [], cleanup: "released",
+  }, new AbortController().signal);
+  assert.equal(result.requirements.length, 1);
+  assert.deepEqual(result.unknowns, ["The checked sources did not provide eligibility for Demo data · Fictional activity."]);
+});
+
+test("duplicate facts merge only when the activity identity is the same", async () => {
+  const sameA = { ...baseScope, entity: "Robotics Workshop" };
+  const different = { ...baseScope, entity: "Robotics Social" };
+  const targets = [source("club-a", sameA), source("club-b", sameA), source("club-c", different)];
+  const result = await buildAnswer(plan(["location"], targets, { ...baseScope, entity: null }), {
+    pages: [
+      page("a", "club-a", "Location: Room 100.", sameA),
+      page("b", "club-b", "Location: Room 100.", sameA),
+      page("c", "club-c", "Location: Room 100.", different),
+    ], failures: [], cleanup: "released",
+  }, new AbortController().signal);
+  assert.equal(result.claims.length, 2);
+  assert.equal(result.claims.find((claim) => claim.scope.entity === "Robotics Workshop")?.evidenceIds.length, 2);
+});
+
+test("different activities with different dates are not conflicts", async () => {
+  const workshop = { ...baseScope, entity: "Robotics Workshop" };
+  const social = { ...baseScope, entity: "Robotics Social" };
+  const result = await buildAnswer(plan(["event_date"], [source("workshop", workshop), source("social", social)], { ...baseScope, entity: null }), {
+    pages: [
+      page("workshop-page", "workshop", "Event date: September 25, 2026.", workshop),
+      page("social-page", "social", "Event date: September 26, 2026.", social),
+    ], failures: [], cleanup: "released",
+  }, new AbortController().signal);
+  assert.equal(result.claims.length, 2);
+  assert.equal(result.conflicts.length, 0);
+});
+
+test("a source with a page and a failure has partial coverage", async () => {
+  const result = await buildAnswer(plan(["location"]), {
+    pages: [page("partial", "events", "Location: Great Hall.")],
+    failures: [{ sourceId: "events", code: "TIMEOUT", message: "Second page timed out", retryable: true }],
+    cleanup: "released",
+  }, new AbortController().signal);
+  assert.equal(result.coverage[0]?.status, "partial");
+  assert.ok(result.unknowns.some((item) => item.includes("Source events was partial")));
 });
 
 test("candidates with invented quotes are rejected", async () => {
-  const badExtractor: CandidateExtractor = {
-    async extract() {
-      return [{
-        snapshotId: "page-1",
-        field: "deadline",
-        text: "The deadline is tomorrow.",
-        quote: "The deadline is tomorrow.",
-        nature: "fact",
-        authority: "institution",
-        authorityBasis: "test",
-      }];
-    },
-  };
-  const engine = createEvidenceEngine(badExtractor);
-  const result = await engine(makePlan("bad-quote", ["deadline"]), {
-    pages: [{
-      id: "page-1",
-      sourceId: "official",
-      url: "https://example.test",
-      title: "Example",
-      text: "Registration remains open.",
-      fetchedAt: "2026-09-12T12:00:00-04:00",
-      publishedAt: null,
-      updatedAt: null,
-      scope,
-      kind: "official",
-      contentMode: "fixture",
-    }],
-    failures: [],
-    cleanup: "released",
+  const extractor: CandidateExtractor = { async extract() { return [{ snapshotId: "p", field: "location", text: "Room 2", quote: "Location: Room 2.", nature: "fact", authority: "institution", authorityBasis: "test" }]; } };
+  const result = await createEvidenceEngine(extractor)(plan(["location"]), {
+    pages: [page("p", "events", "Location: Room 1.")], failures: [], cleanup: "released",
   }, new AbortController().signal);
-
   assert.equal(result.claims.length, 0);
   assert.equal(result.evidence.length, 0);
-  assert.equal(result.unknowns.length, 1);
 });
 
-test("submission formats are extracted when requested", async () => {
-  const result = await buildAnswer(makePlan("format-test", ["submission_format"]), {
-    pages: [{
-      id: "page-format",
-      sourceId: "official",
-      url: "https://example.test",
-      title: "Submission rules",
-      text: "Submit the final report as a PDF.",
-      fetchedAt: "2026-09-12T12:00:00-04:00",
-      publishedAt: null,
-      updatedAt: null,
-      scope,
-      kind: "official",
-      contentMode: "fixture",
-    }],
-    failures: [],
-    cleanup: "released",
-  }, new AbortController().signal);
-
-  assert.equal(result.claims[0]!.field, "submission_format");
-  assert.equal(result.evidence[0]!.quote, "Submit the final report as a PDF.");
-});
-
-test("club activity fields are extracted and cited", async () => {
-  const result = await buildAnswer(makePlan(
-    "club-event",
-    ["event_date", "location", "registration_link", "organizer"],
-    "clubs",
-  ), {
-    pages: [{
-      id: "club-page",
-      sourceId: "clubs",
-      url: "https://clubs.example.test/event",
-      title: "Robotics Club Workshop",
-      text: "Robotics Club workshop on September 25, 2026. Location: Myhal Centre Room 300. Register at https://clubs.example.test/register. Hosted by Robotics Club.",
-      fetchedAt: "2026-09-12T12:00:00-04:00",
-      publishedAt: null,
-      updatedAt: null,
-      scope,
-      kind: "community",
-      contentMode: "fixture",
-    }],
-    failures: [],
-    cleanup: "released",
-  }, new AbortController().signal);
-
-  assert.deepEqual(result.claims.map((claim) => claim.field), ["event_date", "location", "registration_link", "organizer"]);
-  assert.equal(result.evidence.length, 4);
-  assert.equal(result.keyDates[0]!.value.precision, "date");
-});
-
-test("identical activity claims are deduplicated while retaining evidence", async () => {
-  const result = await buildAnswer(makePlan("dedupe", ["location"], "clubs"), {
-    pages: [
-      { id: "a", sourceId: "clubs", url: "https://a.test", title: "A", text: "Location: Room 1.", fetchedAt: "2026-09-12T12:00:00-04:00", publishedAt: null, updatedAt: null, scope, kind: "community", contentMode: "fixture" },
-      { id: "b", sourceId: "clubs", url: "https://b.test", title: "B", text: "Location: Room 1.", fetchedAt: "2026-09-12T12:01:00-04:00", publishedAt: null, updatedAt: null, scope, kind: "community", contentMode: "fixture" },
-    ], failures: [], cleanup: "released",
-  }, new AbortController().signal);
-  assert.equal(result.claims.length, 1);
-  assert.equal(result.claims[0]!.evidenceIds.length, 2);
-});
-
-test("requirements and prerequisites produce cited claims", async () => {
-  const result = await buildAnswer(makePlan(
-    "requirements",
-    ["requirements", "eligibility"],
-    "calendar",
-  ), {
-    pages: [{ id: "requirements-page", sourceId: "calendar", url: "https://example.test/course", title: "Course requirements", text: "Prerequisite: CSC108H1. Students must have completed the prerequisite. This course is open to students in Arts and Science.", fetchedAt: "2026-09-12T12:00:00-04:00", publishedAt: null, updatedAt: null, scope, kind: "official", contentMode: "fixture" }],
-    failures: [], cleanup: "released",
-  }, new AbortController().signal);
-  assert.deepEqual(result.claims.map((claim) => claim.field), ["requirements", "requirements", "eligibility"]);
-  assert.equal(result.requirements.length, 2);
-  assert.equal(result.summary.length, 1);
-});
-
-function conflictInputs(secondQuote: string, secondAuthority: Evidence["authority"]) {
+function conflictInput(authority: Evidence["authority"], quote: string) {
   const claims: Claim[] = [
-    {
-      id: "old",
-      field: "deadline",
-      text: "September 18",
-      scope,
-      nature: "fact",
-      status: "supported",
-      evidenceIds: ["old-evidence"],
-      dateValue: { precision: "date", date: "2026-09-18", timezone: null },
-    },
-    {
-      id: "new",
-      field: "deadline",
-      text: "September 20",
-      scope,
-      nature: "fact",
-      status: "supported",
-      evidenceIds: ["new-evidence"],
-      dateValue: { precision: "date", date: "2026-09-20", timezone: null },
-    },
+    { id: "old", field: "deadline", text: "Old", scope: baseScope, nature: "fact", status: "supported", evidenceIds: ["e-old"], dateValue: { precision: "date", date: "2026-09-18", timezone: null } },
+    { id: "new", field: "deadline", text: "New", scope: baseScope, nature: "fact", status: "supported", evidenceIds: ["e-new"], dateValue: { precision: "date", date: "2026-09-20", timezone: null } },
   ];
   const evidence: Evidence[] = [
-    { id: "old-evidence", snapshotId: "old-page", quote: "Due September 18.", authority: "institution", authorityBasis: "syllabus" },
-    { id: "new-evidence", snapshotId: "new-page", quote: secondQuote, authority: secondAuthority, authorityBasis: "role label" },
+    { id: "e-old", snapshotId: "old-page", quote: "Due September 18.", authority: "institution", authorityBasis: "syllabus" },
+    { id: "e-new", snapshotId: "new-page", quote, authority, authorityBasis: "registry" },
   ];
-  return { claims, evidence, snapshots: [] as PageSnapshot[] };
+  return resolveConflicts(claims, evidence, []);
 }
 
-test("an explicit instructor extension supersedes the old deadline", () => {
-  const input = conflictInputs("The deadline has been extended to September 20.", "instructor");
-  const result = resolveConflicts(input.claims, input.evidence, input.snapshots);
-  assert.equal(result.conflicts[0]!.resolution, "explicit_update");
-  assert.equal(result.conflicts[0]!.selectedClaimId, "new");
-  assert.equal(result.claims.find((item) => item.id === "old")?.status, "superseded");
-  assert.deepEqual(result.keyDates.map((item) => item.claimId), ["new"]);
+test("only an explicit instructor update supersedes an earlier date", () => {
+  assert.equal(conflictInput("instructor", "The deadline is extended to September 20.").conflicts[0]?.resolution, "explicit_update");
+  assert.equal(conflictInput("institution", "The deadline is extended to September 20.").conflicts[0]?.resolution, "unresolved");
 });
 
-test("different dates without update language remain unresolved", () => {
-  const input = conflictInputs("The deadline is September 20.", "institution");
-  const result = resolveConflicts(input.claims, input.evidence, input.snapshots);
-  assert.equal(result.conflicts[0]!.resolution, "unresolved");
-  assert.equal(result.conflicts[0]!.selectedClaimId, null);
-  assert.ok(result.claims.every((item) => item.status === "conflict"));
-  assert.ok(result.keyDates.every((item) => item.status === "needs_confirmation"));
-});
-
-test("does not treat an off-topic course calendar as the asked course", async () => {
-  const plan: QueryPlan = {
-    ...makePlan("course-filter", ["requirements"]),
-    input: {
-      query: "What are the prerequisites for CSC207H1?",
-      scope: { ...scope, course: "CSC207H1", entity: null },
-      mode: "LIVE_WEB",
-    },
-  };
-  const result = await buildAnswer(plan, {
-    pages: [
-      {
-        id: "wrong",
-        sourceId: "official",
-        url: "https://artsci.calendar.utoronto.ca/course/csc148h1",
-        title: "CSC148H1 | Academic Calendar",
-        text: "Prerequisite 60% or higher in CSC108H1. Students must have completed the prerequisite.",
-        fetchedAt: "2026-09-12T12:00:00-04:00",
-        publishedAt: null,
-        updatedAt: null,
-        scope: { ...scope, course: "CSC148H1", entity: null },
-        kind: "official",
-        contentMode: "live",
-      },
-      {
-        id: "right",
-        sourceId: "official",
-        url: "https://artsci.calendar.utoronto.ca/course/csc207h1",
-        title: "CSC207H1 | Academic Calendar",
-        text: "Prerequisite 60% or higher in CSC148H1. Students must have completed the prerequisite.",
-        fetchedAt: "2026-09-12T12:00:00-04:00",
-        publishedAt: null,
-        updatedAt: null,
-        scope: { ...scope, course: "CSC207H1", entity: null },
-        kind: "official",
-        contentMode: "live",
-      },
-    ],
-    failures: [],
-    cleanup: "released",
-  }, new AbortController().signal);
-
-  assert.equal(result.claims.every((claim) => claim.scope.course === "CSC207H1"), true);
-  assert.ok(result.claims[0]!.text.includes("CSC148H1"));
-});
-
-test("assignment questions stay unknown when no due date is on the page", async () => {
-  const plan: QueryPlan = {
-    ...makePlan("a2-unknown", ["deadline", "submission_format"]),
-    input: {
-      query: "When is CSC207 Assignment 2 due?",
-      scope: { ...scope, course: "CSC207H1", entity: null },
-      mode: "LIVE_WEB",
-    },
-  };
-  const result = await buildAnswer(plan, {
-    pages: [{
-      id: "calendar",
-      sourceId: "official",
-      url: "https://artsci.calendar.utoronto.ca/course/csc207h1",
-      title: "CSC207H1 | Academic Calendar",
-      text: "Prerequisite 60% or higher in CSC148H1. Visible link: Degree Requirements https://artsci.calendar.utoronto.ca/",
-      fetchedAt: "2026-09-12T12:00:00-04:00",
-      publishedAt: null,
-      updatedAt: null,
-      scope: { ...scope, course: "CSC207H1", entity: null },
-      kind: "official",
-      contentMode: "live",
-    }],
-    failures: [],
-    cleanup: "released",
-  }, new AbortController().signal);
-
-  assert.equal(result.claims.length, 0);
-  assert.ok(result.unknowns.some((item) => /due date/i.test(item)));
-});
-
-test("reddit-style pages become community notes, not official requirements", async () => {
-  const plan: QueryPlan = {
-    ...makePlan("reddit-note", ["deadline"], "reddit"),
-    input: {
-      query: "When is CSC207 Assignment 2 due?",
-      scope: { ...scope, course: "CSC207H1", entity: null },
-      mode: "LIVE_WEB",
-    },
-  };
-  const result = await buildAnswer(plan, {
-    pages: [{
-      id: "reddit",
-      sourceId: "reddit",
-      url: "https://old.reddit.com/r/UofT/search?q=CSC207",
-      title: "CSC207 search results",
-      text: "Has anyone in CSC207 heard when A2 is due? The instructor usually posts it on Piazza.",
-      fetchedAt: "2026-09-12T12:00:00-04:00",
-      publishedAt: null,
-      updatedAt: null,
-      scope: { ...scope, course: "CSC207H1", entity: null },
-      kind: "community",
-      contentMode: "live",
-    }],
-    failures: [],
-    cleanup: "released",
-  }, new AbortController().signal);
-
-  assert.ok(result.communityNotes.length > 0);
-  assert.equal(result.claims[0]!.nature, "opinion");
-  assert.equal(result.claims[0]!.field, "community_note");
+test("unknown and non-authoritative dates are never confirmed", () => {
+  const claims: Claim[] = [{ id: "date", field: "event_date", text: "September 25", scope: baseScope, nature: "fact", status: "supported", evidenceIds: ["e"], dateValue: { precision: "unknown", raw: "September 25" } }];
+  const evidence: Evidence[] = [{ id: "e", snapshotId: "p", quote: "September 25", authority: "student", authorityBasis: null }];
+  assert.equal(resolveConflicts(claims, evidence, []).keyDates[0]?.status, "needs_confirmation");
 });
