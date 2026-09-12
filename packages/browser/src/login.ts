@@ -23,7 +23,7 @@ const USERNAME_SELECTOR = [
   'input[name*="user" i]',
   'input[id*="user" i]',
   'input[name*="email" i]',
-].join(", ");
+].map((selector) => `${selector}:visible`).join(", ");
 
 export async function attemptCredentialLogin(
   page: Page,
@@ -32,12 +32,17 @@ export async function attemptCredentialLogin(
   signal: AbortSignal,
 ): Promise<LoginResult> {
   throwIfAborted(signal);
-  const loginUrl = assertAllowedUrl(page.url(), target.allowedHosts);
+  let loginUrl: URL;
+  try {
+    loginUrl = assertAllowedUrl(page.url(), target.allowedHosts);
+  } catch {
+    return { status: "form_unsupported" };
+  }
   const credential = await resolveCredential(loginUrl.hostname);
   if (!credential) return { status: "credential_missing" };
 
   const password = page.locator('input[type="password"]:visible').first();
-  const username = page.locator(`${USERNAME_SELECTOR}:visible`).first();
+  const username = page.locator(USERNAME_SELECTOR).first();
   if ((await password.count()) === 0 || (await username.count()) === 0) {
     return { status: "form_unsupported" };
   }
@@ -63,7 +68,9 @@ export async function attemptCredentialLogin(
 
   const finalUrl = page.url();
   const stillHasPassword = (await page.locator('input[type="password"]:visible').count()) > 0;
-  if (looksLikeAuthentication(null, finalUrl) && stillHasPassword) {
+  const body = await page.locator("body").innerText({ timeout: 5_000 }).catch(() => "");
+  const needsSecondFactor = /two[- ]factor|multi[- ]factor|verification code|authenticator|security code/i.test(body);
+  if ((looksLikeAuthentication(null, finalUrl) && stillHasPassword) || needsSecondFactor) {
     return { status: "form_unsupported" };
   }
   assertAllowedUrl(finalUrl, target.allowedHosts);
