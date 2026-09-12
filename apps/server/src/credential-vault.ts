@@ -89,21 +89,17 @@ export class FileCredentialVault implements CredentialVault {
         throw new Error("A credential already exists for this domain.");
       }
       const now = new Date().toISOString();
+      const id = randomUUID();
       const record: StoredCredential = {
-        id: randomUUID(),
+        id,
         domain,
-        secret: this.encrypt(randomUUID(), domain, {
+        secret: this.encrypt(id, domain, {
           username: requireValue(input.username, "Username"),
           password: requireValue(input.password, "Password"),
         }),
         createdAt: now,
         updatedAt: now,
       };
-      // The encryption AAD must use the persisted record ID.
-      record.secret = this.encrypt(record.id, domain, {
-        username: requireValue(input.username, "Username"),
-        password: requireValue(input.password, "Password"),
-      });
       vault.credentials.push(record);
       return this.toMetadata(record);
     });
@@ -138,7 +134,7 @@ export class FileCredentialVault implements CredentialVault {
     return { id: record.id, domain, ...secret };
   }
 
-  private async toMetadata(record: StoredCredential): Promise<CredentialMetadata> {
+  private toMetadata(record: StoredCredential): CredentialMetadata {
     const secret = this.decrypt(record);
     return {
       id: record.id,
