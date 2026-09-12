@@ -11,6 +11,7 @@
 - B0 工程骨架：建立 npm workspace、server/contracts 工作区、共享 TypeScript 配置、环境模板与忽略规则。
 - 使用 Node 24.19.0 和临时 npm 12.0.2 生成唯一 `package-lock.json`；安装审计报告 0 个已知漏洞。
 - B0 后端基础：显式加载仓库根 `.env`，校验 HOST/PORT/OpenAI 配置，提供 `GET /api/health`；未配置 OpenAI key 时保留健康检查和离线测试能力。
+- B/C 接口：`POST /api/browser/collect` 用共享 `QueryPlanSchema` 校验请求，调用 `@allabout/browser`，返回 `{ batch, signals }`；客户端断开时向浏览任务传递取消信号。
 - B1 契约草案：用 Zod 落地 Scope、QueryInput/Plan、Source、Snapshot、BrowserBatch、Claim/Evidence/AnswerBundle、RunStatus 和按 type 判别的 EventEnvelope；TypeScript 类型从 schema 推导。
 - 为 A/C/D 提供 query input、query plan、browser batch、answer bundle 和事件 JSON 样例；课程材料明确标为虚构 fixture。
 - 契约 README 记录边界和三项待确认扩展：cleanup 生命周期、开发 mock 模式、faculty/college scope 字段。当前实现严格遵循原始 v1 草案，尚未宣称团队已冻结。

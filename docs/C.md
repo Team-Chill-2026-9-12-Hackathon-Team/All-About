@@ -10,7 +10,7 @@
 - `packages/browser/src/events-smoke.ts`：真实两页 QueryPlan 验收；写出完整 `BrowserBatch` 和脱敏摘要。
 - `packages/browser/src/smoke.ts`：T+0–1h 的低层探针，保留用于站点诊断。
 - `packages/browser/run-with-key.py`：macOS RTF 凭据启动器，只在内存解析并传入子进程；不复制密钥到仓库。
-- 已合入 B 的 workspace 与 `@allabout/contracts`，`collectPages` 输入输出经过共享 Zod schema 校验；依赖由根锁文件统一管理。
+- 已合入 B 的 workspace 与 `@allabout/contracts`，`collectPages` 输入输出经过共享 Zod schema 校验；B 的 `POST /api/browser/collect` 已实际调用 C，并返回 batch 与浏览事件。
 - 已通过 workspace TypeScript/测试、真实两页 `collectPages`、取消、超时和只读 viewer 视觉验收。C 不实现最终答案或自动 query planner；A/B 仍需把 viewer 事件接入产品 UI。
 
 依赖实装：steel-sdk 0.18.0、playwright 1.63.0、共享 zod 4.6.2；workspace 使用 typescript 5.9.3、tsx 4.23.13、@types/node 24.13.4；Node 22.22.3。
@@ -76,7 +76,7 @@ npm run smoke --prefix packages/browser
 - 12–18h（团队后续可选）：受控课程三页；保底稳定后再选课表等加分项。
 - 18–24h（团队集成阶段）：现场网络复测、20h冻结、22h固定展示、彩排；C 的三轮稳定性重跑已提前完成。
 
-与 B 的共享契约已完成代码层联调：C 直接从 `@allabout/contracts` 导入 QueryPlan、PageSnapshot、BrowserSignal、SourceFailure、BrowserBatch，并以 QueryPlanSchema/BrowserBatchSchema 做运行时边界校验。B 后续可直接从 `@allabout/browser` 导入 `collectPages`。
+与 B 的共享契约和调用链已完成代码层联调：C 直接从 `@allabout/contracts` 导入 QueryPlan、PageSnapshot、BrowserSignal、SourceFailure、BrowserBatch，并以 QueryPlanSchema/BrowserBatchSchema 做运行时边界校验。B 的 `POST /api/browser/collect` 校验请求后调用 `@allabout/browser` 的 `collectPages`，返回 `{ batch, signals }`；其中 `session_ready.viewerUrl` 可供 A 渲染只读播放器。
 
 ## 证据与限制
 
@@ -100,3 +100,4 @@ npm run smoke --prefix packages/browser
 - viewer 验收：Steel Session Player (WebRTC) 返回HTTP200，检测到2个媒体表面；截图1003027字节，视觉确认画面为真实 UofT Events 页面，cleanup=released。
 - 共享契约接入后发现 `tsx` 转译的嵌套 page.evaluate 回调在远端缺少 `__name` helper；已改为 locator API，并同时消除不存在 metadata selector 的30秒隐式等待。
 - 修复后公开查询连续三轮通过：每轮2页、0最终失败、共享 BrowserBatchSchema 通过、cleanup=released；其中两轮触发一次 Hart House 重试后恢复。真实1秒总预算测试正确返回 TIMEOUT 并释放会话。
+- B/C 真实 HTTP 联调通过：`POST /api/browser/collect` 抓取 CSC207H1 Academic Calendar，返回1页、0失败、583字符，并产生 session_ready/step/page_read 信号，cleanup=released。同轮 UofT Events 出现可重试 TIMEOUT，说明现场演示应保留课程官网作为稳定来源。

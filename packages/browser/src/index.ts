@@ -6,7 +6,7 @@ import {
   looksBlocked,
   looksLikeAuthentication,
   readVisibleText,
-} from './page-tools.ts';
+} from './page-tools.js';
 import type {
   BrowserBatch,
   BrowserSignal,
@@ -17,7 +17,7 @@ import type {
 } from '@allabout/contracts';
 
 export type * from '@allabout/contracts';
-export { assertAllowedUrl, readLinks, readVisibleText } from './page-tools.ts';
+export { assertAllowedUrl, readLinks, readVisibleText } from './page-tools.js';
 
 const MIN_TEXT_LENGTH = 100;
 const MAX_SESSION_MS = 5 * 60_000;

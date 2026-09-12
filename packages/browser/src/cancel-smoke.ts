@@ -1,4 +1,4 @@
-import { collectPages, type BrowserSignal, type QueryPlan, type Scope } from './index.ts';
+import { collectPages, type BrowserSignal, type QueryPlan, type Scope } from './index.js';
 
 const scope: Scope = {
   school: 'University of Toronto',
