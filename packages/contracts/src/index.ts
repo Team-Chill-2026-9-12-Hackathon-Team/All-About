@@ -1,1 +1,2 @@
-export const schemaVersion = "1" as const;
+export * from "./schemas.js";
+export * from "./types.js";

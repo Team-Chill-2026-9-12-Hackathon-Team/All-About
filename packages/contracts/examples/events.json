@@ -1,0 +1,55 @@
+[
+  {
+    "schemaVersion": "1",
+    "runId": "run-needs-term",
+    "seq": 1,
+    "at": "2026-09-12T12:00:00-04:00",
+    "type": "clarification_needed",
+    "payload": {
+      "question": "这个问题对应哪个学期？",
+      "missingFields": ["term"]
+    }
+  },
+  {
+    "schemaVersion": "1",
+    "runId": "run-demo101-a2",
+    "seq": 1,
+    "at": "2026-09-12T12:00:00-04:00",
+    "type": "run_status",
+    "payload": {
+      "status": "completed"
+    }
+  },
+  {
+    "schemaVersion": "1",
+    "runId": "run-partial",
+    "seq": 3,
+    "at": "2026-09-12T12:01:00-04:00",
+    "type": "run_status",
+    "payload": {
+      "status": "partial"
+    }
+  },
+  {
+    "schemaVersion": "1",
+    "runId": "run-failed",
+    "seq": 2,
+    "at": "2026-09-12T12:02:00-04:00",
+    "type": "run_error",
+    "payload": {
+      "code": "MODEL_FAILED",
+      "message": "Answer synthesis failed after the allowed retry.",
+      "retryable": false
+    }
+  },
+  {
+    "schemaVersion": "1",
+    "runId": "run-cancelled",
+    "seq": 4,
+    "at": "2026-09-12T12:03:00-04:00",
+    "type": "run_status",
+    "payload": {
+      "status": "cancelled"
+    }
+  }
+]

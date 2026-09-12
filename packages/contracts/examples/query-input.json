@@ -1,0 +1,13 @@
+{
+  "query": "DEMO101 A2 的截止日期更新了吗？",
+  "scope": {
+    "school": "University of Toronto",
+    "campus": "St. George (UTSG)",
+    "term": "Fall 2026",
+    "course": "DEMO101",
+    "section": null,
+    "entity": "Assignment 2"
+  },
+  "sourceIds": ["demo101-syllabus", "demo101-announcement"],
+  "mode": "LIVE_FIXTURE"
+}
