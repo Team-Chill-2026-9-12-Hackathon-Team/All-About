@@ -10,9 +10,10 @@ loadRootEnvironment();
 
 const serverConfig = readServerConfig();
 const vaultKey = process.env.CREDENTIAL_VAULT_KEY;
+const credentialVaultPath = process.env.CREDENTIAL_VAULT_PATH?.trim();
 const credentialVault = vaultKey
   ? new FileCredentialVault(
-      process.env.CREDENTIAL_VAULT_PATH ??
+      credentialVaultPath ||
         fileURLToPath(new URL("../../../.data/credential-vault.json", import.meta.url)),
       decodeCredentialVaultKey(vaultKey),
     )
