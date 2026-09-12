@@ -122,6 +122,45 @@ test("submission formats are extracted when requested", async () => {
   assert.equal(result.evidence[0].quote, "Submit the final report as a PDF.");
 });
 
+test("club activity fields are extracted and cited", async () => {
+  const result = await buildAnswer({
+    runId: "club-event",
+    requestedFields: ["event_date", "location", "registration_link", "organizer"],
+    targets: [{ id: "clubs" }],
+  }, {
+    pages: [{
+      id: "club-page",
+      sourceId: "clubs",
+      url: "https://clubs.example.test/event",
+      title: "Robotics Club Workshop",
+      text: "Robotics Club workshop on September 25, 2026. Location: Myhal Centre Room 300. Register at https://clubs.example.test/register. Hosted by Robotics Club.",
+      fetchedAt: "2026-09-12T12:00:00-04:00",
+      publishedAt: null,
+      updatedAt: null,
+      scope,
+      kind: "community",
+      contentMode: "fixture",
+    }],
+    failures: [],
+    cleanup: "released",
+  }, new AbortController().signal);
+
+  assert.deepEqual(result.claims.map((claim) => claim.field), ["event_date", "location", "registration_link", "organizer"]);
+  assert.equal(result.evidence.length, 4);
+  assert.equal(result.keyDates[0].value.precision, "date");
+});
+
+test("identical activity claims are deduplicated while retaining evidence", async () => {
+  const result = await buildAnswer({ runId: "dedupe", requestedFields: ["location"], targets: [{ id: "clubs" }] }, {
+    pages: [
+      { id: "a", sourceId: "clubs", url: "https://a.test", title: "A", text: "Location: Room 1.", fetchedAt: "2026-09-12T12:00:00-04:00", publishedAt: null, updatedAt: null, scope, kind: "community", contentMode: "fixture" },
+      { id: "b", sourceId: "clubs", url: "https://b.test", title: "B", text: "Location: Room 1.", fetchedAt: "2026-09-12T12:01:00-04:00", publishedAt: null, updatedAt: null, scope, kind: "community", contentMode: "fixture" },
+    ], failures: [], cleanup: "released",
+  }, new AbortController().signal);
+  assert.equal(result.claims.length, 1);
+  assert.equal(result.claims[0].evidenceIds.length, 2);
+});
+
 function conflictInputs(secondQuote: string, secondAuthority: Evidence["authority"]) {
   const claims: Claim[] = [
     {

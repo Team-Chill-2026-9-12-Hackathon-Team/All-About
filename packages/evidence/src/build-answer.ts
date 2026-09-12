@@ -35,6 +35,7 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
 
     const claims: Claim[] = [];
     const evidence: Evidence[] = [];
+    const claimByKey = new Map<string, Claim>();
     for (const candidate of candidates) {
       const snapshot = snapshots.get(candidate.snapshotId);
       if (!snapshot || !quoteExists(candidate.quote, snapshot.text)) continue;
@@ -46,7 +47,15 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
         authority: candidate.authority,
         authorityBasis: candidate.authorityBasis,
       };
-      claims.push({
+      evidence.push(evidenceItem);
+      const dateValue = candidate.dateRaw ? parseDate(candidate.dateRaw) : undefined;
+      const key = JSON.stringify([candidate.field, candidate.text.trim().replace(/\s+/g, " "), snapshot.scope, dateValue]);
+      const existing = claimByKey.get(key);
+      if (existing) {
+        existing.evidenceIds.push(evidenceItem.id);
+        continue;
+      }
+      const claim: Claim = {
         id: `claim-${claims.length + 1}`,
         field: candidate.field,
         text: candidate.text,
@@ -54,9 +63,10 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
         nature: candidate.nature,
         status: "supported",
         evidenceIds: [evidenceItem.id],
-        ...(candidate.dateRaw ? { dateValue: parseDate(candidate.dateRaw) } : {}),
-      });
-      evidence.push(evidenceItem);
+        ...(dateValue ? { dateValue } : {}),
+      };
+      claimByKey.set(key, claim);
+      claims.push(claim);
     }
 
     const failures = new Map(batch.failures.map((item) => [item.sourceId, item]));
