@@ -120,6 +120,99 @@ describe("RunExecutor", () => {
     expect((await waitForTerminal(store)).status).toBe("partial");
   });
 
+  it("waits for clarification and resumes the same run through HTTP", async () => {
+    const store = createStore();
+    const executor = new RunExecutor({
+      runStore: store,
+      sources: [source],
+      collectPages: createMockCollectPages(),
+      buildAnswer: createMockBuildAnswer(),
+      planRun: (runId, plannedInput, sources) => {
+        if (plannedInput.scope.term === null) {
+          return { question: "Which term?", missingFields: ["term"] };
+        }
+        return {
+          runId,
+          input: plannedInput,
+          targets: sources,
+          requestedFields: ["summary"],
+          budget: { maxPages: 3, maxSteps: 6, timeoutMs: 90_000 },
+        };
+      },
+    });
+    const app = buildApp({}, { runStore: store, sources: [source], runExecutor: executor });
+
+    try {
+      await app.inject({ method: "POST", url: "/api/runs", payload: input });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(store.getSnapshot("run-1").status).toBe("needs_input");
+
+      const clarified = await app.inject({
+        method: "POST",
+        url: "/api/runs/run-1/clarification",
+        payload: { scopePatch: { term: "Fall 2026" }, answer: "Fall 2026" },
+      });
+      expect(clarified.statusCode).toBe(200);
+      expect((await waitForTerminal(store)).status).toBe("completed");
+      expect(store.getInput("run-1").scope.term).toBe("Fall 2026");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("fails a run when the active processing budget expires", async () => {
+    const store = createStore();
+    store.create(input);
+    let receivedSignal: AbortSignal | undefined;
+    let release!: () => void;
+    const executor = new RunExecutor({
+      runStore: store,
+      sources: [source],
+      collectPages: async (_plan, _emit, signal) => {
+        receivedSignal = signal;
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return { pages: [], failures: [], cleanup: "released" };
+      },
+      buildAnswer: createMockBuildAnswer(),
+      timeoutMs: 10,
+    });
+
+    executor.start("run-1");
+    expect((await waitForTerminal(store)).status).toBe("failed");
+    expect(receivedSignal?.aborted).toBe(true);
+    const events = store.openEventStream("run-1", 0, () => undefined).replay;
+    expect(events.at(-2)).toMatchObject({ type: "run_error", payload: { code: "TIMEOUT" } });
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(store.getSnapshot("run-1").answer).toBeNull();
+  });
+
+  it("expires a clarification wait without starting a browser adapter", async () => {
+    const store = createStore();
+    store.create(input);
+    let browserStarted = false;
+    const executor = new RunExecutor({
+      runStore: store,
+      sources: [source],
+      collectPages: async () => {
+        browserStarted = true;
+        return { pages: [], failures: [], cleanup: "not_created" };
+      },
+      buildAnswer: createMockBuildAnswer(),
+      planRun: () => ({ question: "Which term?", missingFields: ["term"] }),
+      clarificationTimeoutMs: 10,
+    });
+
+    executor.start("run-1");
+    expect((await waitForTerminal(store)).status).toBe("failed");
+    expect(browserStarted).toBe(false);
+    const events = store.openEventStream("run-1", 0, () => undefined).replay;
+    expect(events.map(({ type }) => type)).toContain("clarification_needed");
+    expect(events.at(-2)).toMatchObject({ type: "run_error", payload: { code: "TIMEOUT" } });
+  });
+
   it("aborts an active adapter and ignores its late result after cancellation", async () => {
     const store = createStore();
     store.create(input);

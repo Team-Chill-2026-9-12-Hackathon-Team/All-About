@@ -32,7 +32,7 @@ export function isTerminalRunStatus(status: RunStatus): boolean {
 const allowedTransitions: Record<RunStatus, ReadonlySet<RunStatus>> = {
   queued: new Set(["planning", "cancelling"]),
   planning: new Set(["needs_input", "browsing", "failed", "cancelling"]),
-  needs_input: new Set(["planning", "cancelling"]),
+  needs_input: new Set(["planning", "failed", "cancelling"]),
   browsing: new Set(["synthesizing", "partial", "failed", "cancelling"]),
   synthesizing: new Set(["completed", "partial", "failed", "cancelling"]),
   completed: new Set(),

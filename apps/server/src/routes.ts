@@ -26,6 +26,7 @@ interface RunRoutesDependencies {
   runStore: RunStore;
   sources: SourceConfig[];
   onRunCreated?: (runId: string) => void;
+  onRunClarified?: (runId: string) => void;
   cancelRun?: (runId: string) => RunSnapshot;
 }
 
@@ -173,13 +174,17 @@ export function registerRunRoutes(
       }
 
       try {
-        return RunSnapshotSchema.parse(
+        const run = RunSnapshotSchema.parse(
           runStore.applyClarification(
             runId,
             removeUndefinedScopeValues(parsedBody.data.scopePatch),
             parsedBody.data.answer,
           ),
         );
+        if (dependencies.onRunClarified !== undefined) {
+          queueMicrotask(() => dependencies.onRunClarified?.(run.runId));
+        }
+        return run;
       } catch (error) {
         if (error instanceof RunNotFoundError) {
           return sendError(reply, 404, "RUN_NOT_FOUND", "Run not found.");

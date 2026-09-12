@@ -27,6 +27,7 @@ export function buildApp(
       ? {}
       : {
           onRunCreated: (runId) => dependencies.runExecutor?.start(runId),
+          onRunClarified: (runId) => dependencies.runExecutor?.start(runId),
           cancelRun: (runId) =>
             dependencies.runExecutor?.cancel(runId) ?? runStore.cancel(runId),
         }),
