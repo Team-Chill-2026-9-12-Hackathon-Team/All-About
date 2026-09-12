@@ -125,6 +125,8 @@ export const BrowserBatchSchema = z.strictObject({
   cleanup: z.enum(["released", "not_created", "release_failed"]),
 });
 
+export const CleanupStateSchema = BrowserBatchSchema.shape.cleanup;
+
 export const DateValueSchema = z.discriminatedUnion("precision", [
   z.strictObject({
     precision: z.literal("instant"),
@@ -247,6 +249,7 @@ export const RunSnapshotSchema = z.strictObject({
   status: RunStatusSchema,
   answer: AnswerBundleSchema.nullable(),
   lastSeq: z.number().int().nonnegative(),
+  cleanup: CleanupStateSchema.nullable(),
 });
 
 export const ClarificationRequestSchema = z.strictObject({

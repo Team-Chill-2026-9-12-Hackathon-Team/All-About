@@ -18,6 +18,7 @@ const requestedFieldSchema = z.enum([
   "submission_format",
   "eligibility",
   "location",
+  "requirements",
   "registration_process",
   "contact",
   "other",
@@ -39,7 +40,17 @@ function sourceMatchesScope(source: SourceConfig, input: QueryInput): boolean {
   return Object.keys(source.scope).every((key) => {
     const scopeKey = key as keyof QueryInput["scope"];
     const sourceValue = source.scope[scopeKey];
-    return sourceValue === null || sourceValue === input.scope[scopeKey];
+    const inputValue = input.scope[scopeKey];
+    if (sourceValue === null || inputValue === null) return true;
+    if (scopeKey === "campus") {
+      const normalizeCampus = (value: string) =>
+        value.toLowerCase().replaceAll(/[^a-z0-9]/g, "");
+      const sourceCampus = normalizeCampus(sourceValue);
+      const inputCampus = normalizeCampus(inputValue);
+      const utsgAliases = new Set(["utsg", "stgeorge", "stgeorgeutsg"]);
+      if (utsgAliases.has(sourceCampus) && utsgAliases.has(inputCampus)) return true;
+    }
+    return sourceValue === inputValue;
   });
 }
 
@@ -98,11 +109,17 @@ export function materializePlannerDecision(
     return source;
   });
 
+  const requestedFields = new Set(decision.requestedFields);
+  if (input.mode === "LIVE_WEB") {
+    requestedFields.add("requirements");
+    requestedFields.add("eligibility");
+  }
+
   return {
     runId,
     input,
     targets,
-    requestedFields: [...new Set(decision.requestedFields)],
+    requestedFields: [...requestedFields],
     budget: { maxPages: 3, maxSteps: 6, timeoutMs: 90_000 },
   };
 }

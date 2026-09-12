@@ -38,6 +38,7 @@ describe("RunStore", () => {
       status: "queued",
       answer: null,
       lastSeq: 1,
+      cleanup: null,
     });
 
     const stream = store.openEventStream("run-1", 0, () => undefined);
@@ -117,5 +118,22 @@ describe("RunStore", () => {
 
     expect(store.cancel("run-1")).toMatchObject({ status: "cancelled", lastSeq: 3 });
     expect(store.cancel("run-1")).toMatchObject({ status: "cancelled", lastSeq: 3 });
+  });
+
+  it("records cleanup after termination and suppresses expired viewer URLs from replay", () => {
+    const store = createStore();
+    store.create(input);
+    store.transition("run-1", "planning");
+    store.transition("run-1", "browsing");
+    store.appendEvent("run-1", "viewer_ready", {
+      viewerUrl: "https://viewer.example.test/session",
+      interactive: false,
+    });
+    store.appendEvent("run-1", "viewer_closed", { reason: "released" });
+    store.transition("run-1", "failed");
+
+    expect(store.setCleanup("run-1", "released").cleanup).toBe("released");
+    expect(store.openEventStream("run-1", 0, () => undefined).replay.map(({ type }) => type))
+      .not.toContain("viewer_ready");
   });
 });

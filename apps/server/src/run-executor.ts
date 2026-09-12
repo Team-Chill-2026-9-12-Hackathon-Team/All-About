@@ -1,5 +1,6 @@
 import {
   QueryPlanSchema,
+  BrowserBatchSchema,
   type BrowserSignal,
   type BuildAnswer,
   type CollectPages,
@@ -104,12 +105,17 @@ export class RunExecutor {
 
       this.#runStore.transition(runId, "browsing");
       errorCode = "NAVIGATION_FAILED";
-      const batch = await this.#withAbort(
-        this.#collectPages(
+      const collection = this.#collectPages(
           plan,
           (signal) => this.#mapBrowserSignal(runId, signal),
           controller.signal,
-        ),
+        ).then((candidate) => BrowserBatchSchema.parse(candidate));
+      void collection.then(
+        (batch) => this.#runStore.setCleanup(runId, batch.cleanup),
+        () => undefined,
+      );
+      const batch = await this.#withAbort(
+        collection,
         controller.signal,
       );
       if (!this.#isWritable(runId)) return;
@@ -165,7 +171,10 @@ export class RunExecutor {
       runId,
       input,
       targets,
-      requestedFields: ["deadline", "submission_format"],
+      requestedFields:
+        input.mode === "LIVE_FIXTURE"
+          ? ["deadline", "submission_format"]
+          : ["deadline", "eligibility", "location", "requirements"],
       budget: { maxPages: 3, maxSteps: 6, timeoutMs: 90_000 },
     });
   }

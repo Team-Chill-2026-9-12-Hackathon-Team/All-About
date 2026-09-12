@@ -1,8 +1,8 @@
-import { RuleBasedExtractor } from "./extract/rule-based-extractor.ts";
-import type { CandidateExtractor } from "./extract/types.ts";
-import { resolveConflicts } from "./conflicts/resolve-conflicts.ts";
-import { quoteExists } from "./text.ts";
-import type { AnswerBlock, AnswerBundle, BrowserBatch, Claim, Evidence, QueryPlan } from "./types.ts";
+import { RuleBasedExtractor } from "./extract/rule-based-extractor.js";
+import type { CandidateExtractor } from "./extract/types.js";
+import { resolveConflicts } from "./conflicts/resolve-conflicts.js";
+import { quoteExists } from "./text.js";
+import type { AnswerBlock, AnswerBundle, BrowserBatch, Claim, Evidence, QueryPlan } from "./types.js";
 
 const MONTHS: Record<string, string> = {
   january: "01", february: "02", march: "03", april: "04",
@@ -15,11 +15,15 @@ function parseDate(raw: string): Claim["dateValue"] {
   if (instant) return { precision: "instant", iso: new Date(raw).toISOString(), timezone: raw.slice(-6) };
   const match = raw.match(/([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})/);
   if (!match) return { precision: "unknown", raw };
-  const month = MONTHS[match[1].toLowerCase()];
+  const [, monthName, day, year] = match;
+  if (monthName === undefined || day === undefined || year === undefined) {
+    return { precision: "unknown", raw };
+  }
+  const month = MONTHS[monthName.toLowerCase()];
   if (!month) return { precision: "unknown", raw };
   return {
     precision: "date",
-    date: `${match[3]}-${month}-${match[2].padStart(2, "0")}`,
+    date: `${year}-${month}-${day.padStart(2, "0")}`,
     timezone: null,
   };
 }

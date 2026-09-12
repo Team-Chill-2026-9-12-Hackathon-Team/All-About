@@ -29,6 +29,7 @@ import type {
   SourceSummarySchema,
   SourcesResponseSchema,
   CancelRunResponseSchema,
+  CleanupStateSchema,
   SourceConfigSchema,
   SourceFailureSchema,
   SourceKindSchema,
@@ -65,6 +66,7 @@ export type ContentMode = z.infer<typeof ContentModeSchema>;
 export type Authority = z.infer<typeof AuthoritySchema>;
 export type FailureCode = z.infer<typeof FailureCodeSchema>;
 export type RunStatus = z.infer<typeof RunStatusSchema>;
+export type CleanupState = z.infer<typeof CleanupStateSchema>;
 
 export type BrowserEmitter = (signal: BrowserSignal) => void;
 export type CollectPages = (

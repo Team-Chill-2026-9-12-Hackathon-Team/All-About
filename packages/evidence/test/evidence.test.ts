@@ -33,7 +33,11 @@ const source: SourceConfig = {
   access: "public",
 };
 
-function makePlan(runId: string, requestedFields: string[]): QueryPlan {
+function makePlan(
+  runId: string,
+  requestedFields: string[],
+  sourceId = source.id,
+): QueryPlan {
   return {
     runId,
     input: {
@@ -42,7 +46,7 @@ function makePlan(runId: string, requestedFields: string[]): QueryPlan {
       mode: "LIVE_FIXTURE",
     },
     requestedFields,
-    targets: [source],
+    targets: [{ ...source, id: sourceId }],
     budget: { maxPages: 3, maxSteps: 6, timeoutMs: 90_000 },
   };
 }
@@ -145,11 +149,11 @@ test("submission formats are extracted when requested", async () => {
 });
 
 test("club activity fields are extracted and cited", async () => {
-  const result = await buildAnswer({
-    runId: "club-event",
-    requestedFields: ["event_date", "location", "registration_link", "organizer"],
-    targets: [{ id: "clubs" }],
-  }, {
+  const result = await buildAnswer(makePlan(
+    "club-event",
+    ["event_date", "location", "registration_link", "organizer"],
+    "clubs",
+  ), {
     pages: [{
       id: "club-page",
       sourceId: "clubs",
@@ -169,22 +173,26 @@ test("club activity fields are extracted and cited", async () => {
 
   assert.deepEqual(result.claims.map((claim) => claim.field), ["event_date", "location", "registration_link", "organizer"]);
   assert.equal(result.evidence.length, 4);
-  assert.equal(result.keyDates[0].value.precision, "date");
+  assert.equal(result.keyDates[0]!.value.precision, "date");
 });
 
 test("identical activity claims are deduplicated while retaining evidence", async () => {
-  const result = await buildAnswer({ runId: "dedupe", requestedFields: ["location"], targets: [{ id: "clubs" }] }, {
+  const result = await buildAnswer(makePlan("dedupe", ["location"], "clubs"), {
     pages: [
       { id: "a", sourceId: "clubs", url: "https://a.test", title: "A", text: "Location: Room 1.", fetchedAt: "2026-09-12T12:00:00-04:00", publishedAt: null, updatedAt: null, scope, kind: "community", contentMode: "fixture" },
       { id: "b", sourceId: "clubs", url: "https://b.test", title: "B", text: "Location: Room 1.", fetchedAt: "2026-09-12T12:01:00-04:00", publishedAt: null, updatedAt: null, scope, kind: "community", contentMode: "fixture" },
     ], failures: [], cleanup: "released",
   }, new AbortController().signal);
   assert.equal(result.claims.length, 1);
-  assert.equal(result.claims[0].evidenceIds.length, 2);
+  assert.equal(result.claims[0]!.evidenceIds.length, 2);
 });
 
 test("requirements and prerequisites produce cited claims", async () => {
-  const result = await buildAnswer({ runId: "requirements", requestedFields: ["requirements", "eligibility"], targets: [{ id: "calendar" }] }, {
+  const result = await buildAnswer(makePlan(
+    "requirements",
+    ["requirements", "eligibility"],
+    "calendar",
+  ), {
     pages: [{ id: "requirements-page", sourceId: "calendar", url: "https://example.test/course", title: "Course requirements", text: "Prerequisite: CSC108H1. Students must have completed the prerequisite. This course is open to students in Arts and Science.", fetchedAt: "2026-09-12T12:00:00-04:00", publishedAt: null, updatedAt: null, scope, kind: "official", contentMode: "fixture" }],
     failures: [], cleanup: "released",
   }, new AbortController().signal);

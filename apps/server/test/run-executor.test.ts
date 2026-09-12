@@ -67,7 +67,11 @@ describe("RunExecutor", () => {
       const snapshot = await waitForTerminal(store);
       expect(snapshot.status).toBe("completed");
       const recovered = await app.inject({ method: "GET", url: "/api/runs/run-1" });
-      expect(recovered.json()).toMatchObject({ status: "completed", lastSeq: 10 });
+      expect(recovered.json()).toMatchObject({
+        status: "completed",
+        lastSeq: 10,
+        cleanup: "released",
+      });
     } finally {
       await app.close();
     }
@@ -93,7 +97,6 @@ describe("RunExecutor", () => {
       "run_status",
       "run_status",
       "run_status",
-      "viewer_ready",
       "browser_step",
       "source_checked",
       "viewer_closed",
@@ -101,6 +104,7 @@ describe("RunExecutor", () => {
       "answer_ready",
       "run_status",
     ]);
+    expect(snapshot.cleanup).toBe("released");
   });
 
   it("marks a result partial when an adapter reports unknowns", async () => {

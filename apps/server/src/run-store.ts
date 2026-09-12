@@ -2,6 +2,7 @@ import {
   AnswerBundleSchema,
   EventEnvelopeSchema,
   type AnswerBundle,
+  type CleanupState,
   type EventEnvelope,
   type QueryInput,
   type RunSnapshot,
@@ -49,6 +50,7 @@ interface RunRecord {
   answer: AnswerBundle | null;
   events: EventEnvelope[];
   clarificationAnswer: string | null;
+  cleanup: CleanupState | null;
 }
 
 export class RunNotFoundError extends Error {
@@ -121,6 +123,7 @@ export class RunStore {
       answer: null,
       events: [],
       clarificationAnswer: null,
+      cleanup: null,
     };
     this.#runs.set(runId, record);
     this.#append(record, "run_status", { status: "queued" });
@@ -138,6 +141,7 @@ export class RunStore {
       status: record.status,
       answer: record.answer === null ? null : structuredClone(record.answer),
       lastSeq: record.events.length,
+      cleanup: record.cleanup,
     };
   }
 
@@ -166,6 +170,12 @@ export class RunStore {
     const record = this.#require(runId);
     record.answer = AnswerBundleSchema.parse(answer);
     this.#append(record, "answer_ready", record.answer);
+    return this.getSnapshot(runId);
+  }
+
+  setCleanup(runId: string, cleanup: CleanupState): RunSnapshot {
+    const record = this.#require(runId);
+    record.cleanup = cleanup;
     return this.getSnapshot(runId);
   }
 
@@ -223,8 +233,13 @@ export class RunStore {
       this.#listeners.set(runId, listeners);
     }
 
+    const viewerClosed = record.events.some((event) => event.type === "viewer_closed");
+    const replay = record.events
+      .slice(afterSeq)
+      .filter((event) => !viewerClosed || event.type !== "viewer_ready");
+
     return {
-      replay: structuredClone(record.events.slice(afterSeq)),
+      replay: structuredClone(replay),
       terminal,
       unsubscribe: () => {
         listeners.delete(listener);

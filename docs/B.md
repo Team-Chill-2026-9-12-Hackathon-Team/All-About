@@ -52,16 +52,22 @@
 - 已合入 `origin/main` 的 A 前端提交。按 A 的 pnpm 锁文件独立安装后，6 个 `node:test` 测试和 production build 均通过；A 当前 README 写有 `pnpm test`，但 package 尚无 test script，实际验证命令为 `node --test tests/history.test.mjs`。
 - 根 npm workspace 明确限定为 `apps/server` 与 `packages/*`，避免 npm 改写 A 的独立 pnpm 前端；根 Vitest 配置排除 `apps/web` 的 Node test，防止两种测试运行器互相误收集。是否最终统一包管理器仍需团队决定。
 - D 适配后严格 TypeScript 检查、6 个原有 Node tests 和 synthetic smoke 均通过。新增 1 个 B→D 集成测试：B 执行器调用 D 的真实 buildAnswer，答案经过 B 引用校验后进入 completed。
-- 当前根级 `npm test` 通过：server 41、contracts 7、evidence 6，共 54 个测试；另有 A 前端 6 个独立 Node tests 及 production build 通过。`gpt-5-mini` 在事实字段 schema 更新后再次通过最小真实规划 smoke。
+- 当前根级 `npm test` 通过：server 47、browser 3、contracts 7、evidence 6，共 63 个测试；另有 A 前端 6 个独立 Node tests 及 production build 通过。`gpt-5-mini` 在事实字段 schema 更新后再次通过最小真实规划 smoke。
 - C 依赖安装后，browser 严格 TypeScript 检查和 3 个无凭据测试通过，覆盖 exact-host HTTPS 白名单、阻断/登录识别及预取消不创建 Steel session。B runtime/503 专项测试通过。
 - 合并 C/D 与 runtime 后，根级 `npm run typecheck` 通过；根级 `npm test` 通过，共 server 42、browser 3、contracts 7、evidence 6，即 58 个测试。A 的 6 个前端 Node tests 与 production build 继续独立验证。
 - `docs/B_CONTRACT_PROPOSALS.md` 已记录 authority、cleanup/viewer 生命周期与事实字段语义的共享契约提案；未收到 A/C/D 回复前不宣称冻结。
+- 用户已明确指定外部 `TEAM_MIN_DEMO_B.md` 作为执行指令；逐项对照当前分支后实施。新增 `docs/B_MIN_DEMO_TEST_PLAN.md`，区分离线预检、缺依赖启动检查与真实 Steel 验收。
+- 新增 synthetic minimum-demo 全链路预检：HTTP 创建任务 → B runtime → 测试专用 mock C → D 真实公共入口 → B 校验 → 终态与 SSE 历史。测试模式固定为 `LIVE_FIXTURE`，不冒充 `LIVE_WEB`。
+- 2026-09-12 公开可达性检查确认 CSC207 Academic Calendar 与 U of T Events 两个 exact-host URL 能返回内容；尚未在本机经 Steel 验证，因此不记作 C 真实浏览通过。
 
 ## 当前边界
 
-- B0 本地实现已完成；B1 v1 契约草案已实现并通过测试，C/D 已在 B 集成分支消费共享契约，仍等待 A 的正式评审后才可标记冻结。通用 C/D runtime 已接线；本机缺少 Steel key 和已确认的真实 source registry，暂无本机真实浏览端到端结果。
+- B0–B4 与 synthetic minimum-demo 预检已完成；C/D 已在 B 集成分支消费共享契约，仍等待 A 的正式评审后才可标记冻结。通用 C/D runtime 和 live source registry 已接线；C 独立 Academic Calendar smoke 已真实通过，但 B 的 HTTP → Steel → D 端到端仍未在本机验收。
 - 实际 Git checkout：`C:\Users\xuziq\Desktop\hackthon\work\github-sync`。
 - 真实密钥已安全复制到此 checkout 的 `.env`，该文件被 Git 忽略；未输出或暂存密钥。
 - 当前 Codex 运行环境能运行 Node，但没有全局 `npm` 命令；通过临时 npm 12.0.2 完成依赖安装。团队普通 Node/npm 环境可直接使用锁文件；本地后续检查可直接调用已安装工具。
 - 正常团队命令：`npm install`、`npm run dev:server`、`npm run typecheck`、`npm test`。当前 Codex 终端的验证使用锁文件中相同工具直接执行，并额外完成真实服务烟测。
-- 下一步：等待用户确认首个真实 demo 与提供 Steel key 文件路径；同时形成 authority/cleanup 契约提案并完成无凭据失败路径。拿到凭据后再做本机真实 C→D 端到端。当前建议 demo 为面向 UTSG 全体学生的 Xplore Hart House 活动。
+- 2026-09-12 本次接管已从结构化交接包恢复 B/contracts 改动，修复 `RunSnapshot.cleanup` 的旧路由断言；`npm install`、根级 typecheck 和 63 个测试全部通过。A 隔离工程 production build 与 6 个 Node tests 通过。恢复期间未修改 `packages/evidence/`，D 继续从 `@allabout/contracts` 导入类型。
+- 2026-09-12 真实单来源集成烟测：经 Vite `/api` 代理创建 CSC207 LIVE_WEB run，HTTP 202；SSE 收到 viewer_ready、两次 browser_step、source_checked、viewer_closed、answer_ready 和终态，0 source_failed/run_error，cleanup=released。首次运行在旧 D 下诚实返回 partial、0 claims/evidence。
+- 随后合入 D 的 `69a8967 fix(evidence): extract requirements and prerequisites` 及其前置提交；B 的 LIVE_WEB planner 边界强制包含 `requirements`、`eligibility`。修正 D 最新分支的 NodeNext 相对导入与严格测试 fixture 后，全量检查通过。重启前后端后，同一 `smoke:live` 成功返回 completed、1 claim、1 evidence、0 unknown、cleanup=released，所有 assertion（含 answerReady）为 true。
+- 下一步：保留 CSC207 作为单来源保底，连续复跑并记录稳定性；随后再启用 U of T Events。Events 波动不得阻塞 Academic Calendar 保底。A 仍需把真实 SSE/AnswerBundle 接入界面。

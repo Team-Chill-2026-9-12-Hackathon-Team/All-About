@@ -10,6 +10,7 @@ describe("readServerConfig", () => {
       openAiApiKey: undefined,
       openAiModel: undefined,
       openAiConfigured: false,
+      steelConfigured: false,
     });
   });
 
@@ -19,6 +20,7 @@ describe("readServerConfig", () => {
       PORT: "3100",
       OPENAI_API_KEY: "test-key",
       OPENAI_MODEL: "test-model",
+      STEEL_API_KEY: "test-steel-key",
       UNRELATED_SECRET: "must-not-leak",
     });
 
@@ -28,11 +30,17 @@ describe("readServerConfig", () => {
       openAiApiKey: "test-key",
       openAiModel: "test-model",
       openAiConfigured: true,
+      steelConfigured: true,
     });
     expect(result).not.toHaveProperty("UNRELATED_SECRET");
   });
 
   it("rejects an invalid port", () => {
     expect(() => readServerConfig({ PORT: "70000" })).toThrow();
+  });
+
+  it("requires both OpenAI values before reporting the planner configured", () => {
+    expect(readServerConfig({ OPENAI_API_KEY: "test-key" }).openAiConfigured).toBe(false);
+    expect(readServerConfig({ OPENAI_MODEL: "gpt-5-mini" }).openAiConfigured).toBe(false);
   });
 });

@@ -102,6 +102,7 @@ describe("HTTP boundary schemas", () => {
       status: "queued",
       answer: null,
       lastSeq: 1,
+      cleanup: null,
     });
     ClarificationRequestSchema.parse({
       scopePatch: { term: "Fall 2026" },

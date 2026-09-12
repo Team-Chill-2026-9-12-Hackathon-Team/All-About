@@ -46,6 +46,12 @@ describe("materializePlannerDecision", () => {
     expect(plan).toMatchObject({
       runId: "run-1",
       targets: [source],
+      requestedFields: [
+        "deadline",
+        "submission_format",
+        "requirements",
+        "eligibility",
+      ],
       budget: { maxPages: 3, maxSteps: 6, timeoutMs: 90_000 },
     });
   });
@@ -81,6 +87,16 @@ describe("materializePlannerDecision", () => {
     expect(() =>
       materializePlannerDecision("run-1", input, [{ ...source, contentMode: "fixture" }], planDecision),
     ).toThrow(/incompatible with LIVE_WEB/);
+  });
+
+  it("treats UTSG and St. George (UTSG) as the same campus", () => {
+    const result = materializePlannerDecision(
+      "run-1",
+      input,
+      [{ ...source, scope: { ...source.scope, campus: "UTSG" } }],
+      planDecision,
+    );
+    expect(result).toMatchObject({ runId: "run-1", targets: [{ id: source.id }] });
   });
 });
 

@@ -120,6 +120,7 @@ describe("run HTTP API", () => {
       status: "queued",
       answer: null,
       lastSeq: 1,
+      cleanup: null,
     });
   });
 

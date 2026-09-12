@@ -29,9 +29,11 @@ All sample course content is fictional and marked with `LIVE_FIXTURE` / `fixture
 
 ## Contract status
 
-Schema version `1` implements the agreed draft without the unresolved extensions below. Team confirmation is still required before adding:
+Schema version `1` includes the user-directed cleanup field on the run status
+response. A `viewer_closed` event invalidates the earlier viewer URL, and late SSE
+replay omits that expired `viewer_ready` event. The remaining extensions are not
+implemented:
 
-- A cleanup lifecycle signal and cleanup field on the run status response.
 - A development-only mock mode exposed through HTTP/UI.
 - A faculty/college field in `Scope`; the P0 schema currently represents UTSG-wide, course, section, and entity scope without that extra dimension.
 
