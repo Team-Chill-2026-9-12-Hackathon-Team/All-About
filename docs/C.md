@@ -73,8 +73,8 @@ npm run smoke --prefix packages/browser
 - 1–3h：已完成。固定 QueryPlan 输出两张完整 PageSnapshot，两个页面都贡献可核对信息。
 - 3–6h：已完成公共函数、共享契约、exact-host/私网防护、失败分类、一次重试、取消、总预算与清理。
 - 6–12h：已完成 viewer 独立验收、取消/超时测试和公开来源三轮连续重跑；A/B 产品 UI 联调由对应 owner 继续。
-- 12–18h：受控课程三页；保底稳定后再选课表等加分项。
-- 18–24h：现场网络、三轮重跑、20h冻结、22h固定展示、彩排。
+- 12–18h（团队后续可选）：受控课程三页；保底稳定后再选课表等加分项。
+- 18–24h（团队集成阶段）：现场网络复测、20h冻结、22h固定展示、彩排；C 的三轮稳定性重跑已提前完成。
 
 与 B 的共享契约已完成代码层联调：C 直接从 `@allabout/contracts` 导入 QueryPlan、PageSnapshot、BrowserSignal、SourceFailure、BrowserBatch，并以 QueryPlanSchema/BrowserBatchSchema 做运行时边界校验。B 后续可直接从 `@allabout/browser` 导入 `collectPages`。
 
@@ -95,7 +95,7 @@ npm run smoke --prefix packages/browser
 - 活动批次：2026-09-12 16:15 UTC，约6.6秒；Xplore详情9591字符、规则7636字符；均HTTP200。两批成功会话均retrieve确认released。
 - 初始两次成功均收到viewer URL；后续另行完成实际播放器视觉验收。上述耗时是单次观察，不是性能保证；规则表的语义提取仍需单独验收。
 - 公共函数验收：2026-09-12 16:27 UTC，约10.3秒；UofT Events 13920字符，Xplore详情9585字符。Hart House 首次请求被拦截，函数按预算重试后成功；2页、0最终失败、viewer事件和released清理均通过。
-- 规则详情页和活动详情页在连续测试中都出现过间歇性403，因此保底改为每个域名只访问一页，并保留单次重试；仍需连续三轮稳定性验收。
+- 规则详情页和活动详情页在连续测试中都出现过间歇性403，因此保底改为每个域名只访问一页，并保留单次重试；连续三轮稳定性验收已完成，现场网络波动仍需在彩排时复测。
 - 移除自定义 sessionId 后，16:30 与 16:31 UTC 两轮公共函数验收均通过；后一轮 Hart House 使用一次重试，总耗时约11.6秒。执行中取消验收也通过：0页、CANCELLED、source_failed事件、cleanup=released。
 - viewer 验收：Steel Session Player (WebRTC) 返回HTTP200，检测到2个媒体表面；截图1003027字节，视觉确认画面为真实 UofT Events 页面，cleanup=released。
 - 共享契约接入后发现 `tsx` 转译的嵌套 page.evaluate 回调在远端缺少 `__name` helper；已改为 locator API，并同时消除不存在 metadata selector 的30秒隐式等待。
