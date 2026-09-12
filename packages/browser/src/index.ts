@@ -1,5 +1,6 @@
 import Steel from 'steel-sdk';
 import { chromium, type Browser, type Page } from 'playwright';
+import { BrowserBatchSchema, QueryPlanSchema } from '@allabout/contracts';
 import {
   assertAllowedUrl,
   looksBlocked,
@@ -13,9 +14,9 @@ import type {
   QueryPlan,
   SourceConfig,
   SourceFailure,
-} from './types.ts';
+} from '@allabout/contracts';
 
-export type * from './types.ts';
+export type * from '@allabout/contracts';
 export { assertAllowedUrl, readLinks, readVisibleText } from './page-tools.ts';
 
 const MIN_TEXT_LENGTH = 100;
@@ -26,6 +27,7 @@ export async function collectPages(
   emit: (signal: BrowserSignal) => void,
   signal: AbortSignal,
 ): Promise<BrowserBatch> {
+  QueryPlanSchema.parse(plan);
   validatePlan(plan);
 
   const pages: PageSnapshot[] = [];
@@ -34,7 +36,7 @@ export async function collectPages(
     for (const target of plan.targets.slice(0, plan.budget.maxPages)) {
       addFailure(failures, emit, cancelled(target.id));
     }
-    return { pages, failures, cleanup: 'not_created' };
+    return BrowserBatchSchema.parse({ pages, failures, cleanup: 'not_created' });
   }
 
   const steelAPIKey = process.env.STEEL_API_KEY;
@@ -110,6 +112,7 @@ export async function collectPages(
           finalFailure = null;
           break;
         } catch (error) {
+          debugBrowserError(target.id, error, steelAPIKey);
           finalFailure = classifyTargetError(target.id, error, signal, timeoutController);
           const canRetry =
             attempt === 0 &&
@@ -145,7 +148,7 @@ export async function collectPages(
     }
   }
 
-  return { pages, failures, cleanup };
+  return BrowserBatchSchema.parse({ pages, failures, cleanup });
 }
 
 async function collectTarget(
@@ -338,4 +341,15 @@ class BrowserTargetError extends Error {
     this.code = code;
     this.retryable = retryable;
   }
+}
+
+function debugBrowserError(sourceId: string, error: unknown, steelAPIKey: string): void {
+  if (process.env.BROWSER_DEBUG !== '1') return;
+  const name = error instanceof Error ? error.name : 'UnknownError';
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  const message = rawMessage
+    .split(steelAPIKey).join('[REDACTED]')
+    .replace(/(?:https?|wss?):\/\/\S+/g, '[URL]')
+    .slice(0, 1_000);
+  console.error(JSON.stringify({ type: 'browser_debug', sourceId, name, message }));
 }

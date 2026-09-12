@@ -1,7 +1,7 @@
 # C — UTSG 浏览器：开工记录与网站清单
 
 核验：2026-09-12。用户确认首版 UTSG，开工时剩余 24 小时；不要默认为 UTSG 所有学院共用 Arts & Science 规定。
-仓库：Team-Chill-2026-9-12-Hackathon-Team/All-About；本地分支 feat/browser。检查 main 时仅有 README，共享契约尚未建立。
+仓库：Team-Chill-2026-9-12-Hackathon-Team/All-About；本地分支 feat/browser。已合入 `origin/feat/orchestrator` 的 workspace、server 基础和共享契约。
 
 ## 本轮交付
 
@@ -10,20 +10,25 @@
 - `packages/browser/src/events-smoke.ts`：真实两页 QueryPlan 验收；写出完整 `BrowserBatch` 和脱敏摘要。
 - `packages/browser/src/smoke.ts`：T+0–1h 的低层探针，保留用于站点诊断。
 - `packages/browser/run-with-key.py`：macOS RTF 凭据启动器，只在内存解析并传入子进程；不复制密钥到仓库。
-- 模块独立 package.json / tsconfig，未改根配置。临时本地安装依赖，无模块锁文件；B 建 workspace 时迁移到根统一锁文件。
-- 已通过 TypeScript 检查、基础单元测试和真实两页 `collectPages` 验收。没有实现最终答案、自动候选链接选择或 UI viewer 播放。
+- 已合入 B 的 workspace 与 `@allabout/contracts`，`collectPages` 输入输出经过共享 Zod schema 校验；依赖由根锁文件统一管理。
+- 已通过 workspace TypeScript/测试、真实两页 `collectPages`、取消、超时和只读 viewer 视觉验收。C 不实现最终答案或自动 query planner；A/B 仍需把 viewer 事件接入产品 UI。
 
-依赖实装：steel-sdk 0.18.0、playwright 1.63.0、typescript 7.0.2、@types/node 22.20.2；Node 22.22.3。
+依赖实装：steel-sdk 0.18.0、playwright 1.63.0、共享 zod 4.6.2；workspace 使用 typescript 5.9.3、tsx 4.23.13、@types/node 24.13.4；Node 22.22.3。
 
 ```sh
-# 在仓库根目录执行；安装只作用于 C 的模块
-npm install --prefix packages/browser --no-package-lock
-npm run typecheck --prefix packages/browser
+# 在仓库根目录执行；使用 workspace 统一锁文件
+npm install
+npm run typecheck
+npm test
 python3 packages/browser/run-with-key.py /absolute/path/to/SteelKey.rtf
 # 运行公共 collectPages 两页验收
 python3 packages/browser/run-with-key.py /absolute/path/to/SteelKey.rtf smoke:collect
 # 真实创建后在导航阶段取消，并验证远端释放
 python3 packages/browser/run-with-key.py /absolute/path/to/SteelKey.rtf smoke:cancel
+# 本机 Chrome 打开只读 viewer 并保存截图验收
+python3 packages/browser/run-with-key.py /absolute/path/to/SteelKey.rtf smoke:viewer
+# 1秒总预算，验证 TIMEOUT 与释放
+python3 packages/browser/run-with-key.py /absolute/path/to/SteelKey.rtf smoke:timeout
 # 只测候选活动两页
 SMOKE_SET=events python3 packages/browser/run-with-key.py /absolute/path/to/SteelKey.rtf
 # 非 macOS：通过环境注入 STEEL_API_KEY，然后运行
@@ -64,14 +69,14 @@ npm run smoke --prefix packages/browser
 
 ## 24h 执行与待接接口
 
-- 0–1h：key/session/CDP/两页读取/释放已有实测；iframe 的实际播放仍未验收。
+- 0–1h：已完成 key/session/CDP/两页读取/释放和真实 viewer 播放视觉验收。
 - 1–3h：已完成。固定 QueryPlan 输出两张完整 PageSnapshot，两个页面都贡献可核对信息。
-- 3–6h：公共函数、allowedHosts、失败分类、取消、总预算与清理已提前完成；待 B 发布正式契约后替换本地临时类型并联调。
-- 6–12h：实际 viewer 联调；错误/取消/超时测试，锁定公开来源保底。
+- 3–6h：已完成公共函数、共享契约、exact-host/私网防护、失败分类、一次重试、取消、总预算与清理。
+- 6–12h：已完成 viewer 独立验收、取消/超时测试和公开来源三轮连续重跑；A/B 产品 UI 联调由对应 owner 继续。
 - 12–18h：受控课程三页；保底稳定后再选课表等加分项。
 - 18–24h：现场网络、三轮重跑、20h冻结、22h固定展示、彩排。
 
-给 B 的交接请求（文件记录，尚未发送）：建立 packages/contracts，落实计划中的 QueryPlan、PageSnapshot、BrowserSignal、SourceFailure、BrowserBatch；根 workspace 安装 steel-sdk/playwright 并统一锁版本。C 已实现公共函数，当前只需把集中在 `src/types.ts` 的临时类型替换为共享 import。
+与 B 的共享契约已完成代码层联调：C 直接从 `@allabout/contracts` 导入 QueryPlan、PageSnapshot、BrowserSignal、SourceFailure、BrowserBatch，并以 QueryPlanSchema/BrowserBatchSchema 做运行时边界校验。B 后续可直接从 `@allabout/browser` 导入 `collectPages`。
 
 ## 证据与限制
 
@@ -82,13 +87,16 @@ npm run smoke --prefix packages/browser
 - [UTORid](https://utorid.utoronto.ca/)：Quercus/ACORN 的登录关联。
 - [Steel SDK](https://github.com/steel-dev/steel-node)：签名以已安装的0.18.0类型复核。
 
-首次创建尝试和取消验收各出现一次 HTTP400；当前部署返回的明确原因是它不支持调用方自定义 sessionId，因为 ID 编码了调度器选择的区域。实现已按该部署要求改为使用 create 响应返回的 ID。若创建请求已到达但响应丢失，客户端无法得知该区域化 ID；这是当前清理能力的边界。还需连续重跑和真实 viewer 播放验证。
+首次创建尝试和取消验收各出现一次 HTTP400；当前部署返回的明确原因是它不支持调用方自定义 sessionId，因为 ID 编码了调度器选择的区域。实现已按该部署要求改为使用 create 响应返回的 ID。若创建请求已到达但响应丢失，客户端无法得知该区域化 ID；这是当前清理能力的边界。
 
 ## 本轮实际测量
 
 - 公共站点批次：2026-09-12 16:14 UTC，约17.6秒（含会话创建、5页访问、释放）；CSC207 584字符、CSC148 1047字符，Student Life入口1044字符、TTB入口1105字符；日期页56字符判NO_MATCH。
 - 活动批次：2026-09-12 16:15 UTC，约6.6秒；Xplore详情9591字符、规则7636字符；均HTTP200。两批成功会话均retrieve确认released。
-- 两次成功均收到viewer URL，但未播放验证。上述耗时是单次观察，不是性能保证；规则表的语义提取仍需单独验收。
+- 初始两次成功均收到viewer URL；后续另行完成实际播放器视觉验收。上述耗时是单次观察，不是性能保证；规则表的语义提取仍需单独验收。
 - 公共函数验收：2026-09-12 16:27 UTC，约10.3秒；UofT Events 13920字符，Xplore详情9585字符。Hart House 首次请求被拦截，函数按预算重试后成功；2页、0最终失败、viewer事件和released清理均通过。
 - 规则详情页和活动详情页在连续测试中都出现过间歇性403，因此保底改为每个域名只访问一页，并保留单次重试；仍需连续三轮稳定性验收。
 - 移除自定义 sessionId 后，16:30 与 16:31 UTC 两轮公共函数验收均通过；后一轮 Hart House 使用一次重试，总耗时约11.6秒。执行中取消验收也通过：0页、CANCELLED、source_failed事件、cleanup=released。
+- viewer 验收：Steel Session Player (WebRTC) 返回HTTP200，检测到2个媒体表面；截图1003027字节，视觉确认画面为真实 UofT Events 页面，cleanup=released。
+- 共享契约接入后发现 `tsx` 转译的嵌套 page.evaluate 回调在远端缺少 `__name` helper；已改为 locator API，并同时消除不存在 metadata selector 的30秒隐式等待。
+- 修复后公开查询连续三轮通过：每轮2页、0最终失败、共享 BrowserBatchSchema 通过、cleanup=released；其中两轮触发一次 Hart House 重试后恢复。真实1秒总预算测试正确返回 TIMEOUT 并释放会话。

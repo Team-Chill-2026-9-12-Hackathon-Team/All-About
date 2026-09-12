@@ -1,18 +1,23 @@
 {
   "dependencies": {
-    "@types/node": "22.20.2",
+    "@allabout/contracts": "*",
     "playwright": "1.63.0",
-    "steel-sdk": "0.18.0",
-    "typescript": "7.0.2"
+    "steel-sdk": "0.18.0"
   },
   "name": "@allabout/browser",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "smoke": "node --experimental-strip-types src/smoke.ts",
-    "smoke:collect": "node --experimental-strip-types src/events-smoke.ts",
-    "smoke:cancel": "node --experimental-strip-types src/cancel-smoke.ts",
-    "test": "node --experimental-strip-types --test test/*.test.ts"
+    "smoke": "tsx src/smoke.ts",
+    "smoke:collect": "tsx src/events-smoke.ts",
+    "smoke:cancel": "tsx src/cancel-smoke.ts",
+    "smoke:viewer": "tsx src/viewer-smoke.ts",
+    "smoke:timeout": "tsx src/timeout-smoke.ts",
+    "test": "tsx --test test/*.test.ts"
   }
 }

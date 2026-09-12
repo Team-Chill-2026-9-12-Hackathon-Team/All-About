@@ -16,6 +16,18 @@ test('allows only an exact registered HTTPS host', () => {
     () => assertAllowedUrl('http://harthouse.ca/events/example', ['harthouse.ca']),
     /HTTPS/,
   );
+  assert.throws(
+    () => assertAllowedUrl('https://localhost/admin', ['localhost']),
+    /not allowed/,
+  );
+  assert.throws(
+    () => assertAllowedUrl('https://127.0.0.1/admin', ['127.0.0.1']),
+    /not allowed/,
+  );
+  assert.throws(
+    () => assertAllowedUrl('https://192.168.1.2/admin', ['192.168.1.2']),
+    /not allowed/,
+  );
 });
 
 test('distinguishes access checks and login redirects', () => {
@@ -43,7 +55,7 @@ test('a pre-cancelled run does not create a Steel session', async () => {
       id: 'one', kind: 'official', label: 'one', entryUrl: 'https://example.com',
       allowedHosts: ['example.com'], scope, contentMode: 'live', access: 'public',
     }],
-    requestedFields: [],
+    requestedFields: ['test'],
     budget: { maxPages: 1, maxSteps: 2, timeoutMs: 1_000 },
   };
   const events: string[] = [];
