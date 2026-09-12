@@ -1,0 +1,6 @@
+node_modules/
+artifacts/
+.env*
+*.rtf
+package-lock.json
+__pycache__/
