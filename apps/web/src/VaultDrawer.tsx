@@ -62,7 +62,11 @@ export function VaultDrawer({ open, onClose }: { open: boolean; onClose: () => v
           <div><KeyRound size={18} /><h2 id="vault-heading">Steel keychain</h2></div>
           <button className="icon-button" aria-label="Close password vault" onClick={onClose}><X size={18} /></button>
         </div>
-        <p className="history-description">Accounts Steel may use only on the exact saved domain.</p>
+        <p className="history-description">
+          Save the portal host, not a path: <code>piazza.com</code>, <code>q.utoronto.ca</code>,
+          <code>www.acorn.utoronto.ca</code>, or <code>idpz.utorauth.utoronto.ca</code> for UTORid.
+          Steel may fill that password on the matching portal or the UofT sign-in host. UTORMFA still needs you.
+        </p>
         <div className="vault-notice"><ShieldCheck size={15} />Username and password are encrypted on the server.</div>
         {error && <p className="vault-error" role="alert">{error}</p>}
         <div className="vault-list">

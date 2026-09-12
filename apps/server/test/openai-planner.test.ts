@@ -105,6 +105,17 @@ describe("materializePlannerDecision", () => {
     ]);
   });
 
+  it("raises the browser step budget when a target needs keychain login", () => {
+    const plan = materializePlannerDecision(
+      "run-1",
+      { ...input, sourceIds: ["quercus-login"] },
+      [{ ...source, id: "quercus-login", access: "authorized" }],
+      { ...planDecision, sourceIds: ["quercus-login"] },
+    );
+    if (!("budget" in plan)) throw new Error("expected a query plan");
+    expect(plan.budget).toEqual({ maxPages: 3, maxSteps: 12, timeoutMs: 90_000 });
+  });
+
   it("treats UTSG and St. George (UTSG) as the same campus", () => {
     const result = materializePlannerDecision(
       "run-1",

@@ -142,6 +142,7 @@ export class RunStore {
       answer: record.answer === null ? null : structuredClone(record.answer),
       lastSeq: record.events.length,
       cleanup: record.cleanup,
+      viewerUrl: liveViewerUrl(record),
     };
   }
 
@@ -277,4 +278,17 @@ export class RunStore {
     }
     return structuredClone(event);
   }
+}
+
+function liveViewerUrl(record: RunRecord): string | null {
+  let viewerUrl: string | null = null;
+  for (const event of record.events) {
+    if (event.type === "viewer_ready") {
+      viewerUrl = event.payload.viewerUrl;
+    }
+    if (event.type === "viewer_closed") {
+      viewerUrl = null;
+    }
+  }
+  return viewerUrl;
 }

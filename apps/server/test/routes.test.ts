@@ -121,6 +121,7 @@ describe("run HTTP API", () => {
       answer: null,
       lastSeq: 1,
       cleanup: null,
+      viewerUrl: null,
     });
   });
 
@@ -248,5 +249,49 @@ describe("run event stream", () => {
       headers: { "last-event-id": "run-1:4" },
     });
     expect(future.statusCode).toBe(409);
+  });
+
+  it("inherits course context from a finished parent run", async () => {
+    const store = createStore();
+    const app = buildRouteApp(store);
+    apps.push(app);
+
+    const parent = await app.inject({
+      method: "POST",
+      url: "/api/runs",
+      payload: {
+        ...input,
+        query: "Did the DEMO101 A2 deadline change?",
+        scope: { ...input.scope, course: "DEMO101", term: "Fall 2026", entity: "Assignment 2" },
+        sourceIds: ["demo101-syllabus"],
+        mode: "LIVE_FIXTURE",
+      },
+    });
+    expect(parent.statusCode).toBe(202);
+    await app.inject({ method: "POST", url: "/api/runs/run-1/cancel" });
+
+    const child = await app.inject({
+      method: "POST",
+      url: "/api/runs",
+      payload: {
+        query: "What about the late penalty?",
+        scope: {
+          school: "University of Toronto",
+          campus: "UTSG",
+          term: null,
+          course: null,
+          section: null,
+          entity: null,
+        },
+        mode: "LIVE_WEB",
+        parentRunId: "run-1",
+      },
+    });
+    expect(child.statusCode).toBe(202);
+    expect(store.getInput("run-2")).toMatchObject({
+      mode: "LIVE_FIXTURE",
+      scope: { course: "DEMO101", entity: "Assignment 2", term: "Fall 2026" },
+      sourceIds: ["demo101-syllabus"],
+    });
   });
 });

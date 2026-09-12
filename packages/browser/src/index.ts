@@ -2,12 +2,7 @@ import Steel from 'steel-sdk';
 import { chromium, type Browser, type Page } from 'playwright';
 import { BrowserBatchSchema, QueryPlanSchema } from '@allabout/contracts';
 import { fallbackUrlFor, shouldUseFallback } from './fallbacks.js';
-import {
-  credentialForHost,
-  fillLoginForm,
-  pageHasLoginForm,
-  type SiteCredential,
-} from './login.js';
+import { attemptCredentialLogin, type CredentialResolver } from './login.js';
 import {
   assertAllowedUrl,
   looksBlocked,
@@ -16,8 +11,7 @@ import {
   readVisibleText,
 } from './page-tools.js';
 
-export type { SiteCredential } from './login.js';
-export { credentialForHost, fillLoginForm, hostsMatch, pageHasLoginForm } from './login.js';
+export { attemptCredentialLogin, loginHostsFor, type CredentialResolver } from './login.js';
 import type {
   BrowserBatch,
   BrowserSignal,
@@ -37,7 +31,7 @@ export async function collectPages(
   plan: QueryPlan,
   emit: (signal: BrowserSignal) => void,
   signal: AbortSignal,
-  options: { credentials?: SiteCredential[] } = {},
+  resolveCredential?: CredentialResolver,
 ): Promise<BrowserBatch> {
   QueryPlanSchema.parse(plan);
   validatePlan(plan);
@@ -121,7 +115,7 @@ export async function collectPages(
         try {
           await collectTarget(page, activeTarget, plan, combinedSignal, emit, () => {
             stepCount += 1;
-          }, pages, options.credentials ?? []);
+          }, pages, resolveCredential);
           finalFailure = null;
           break;
         } catch (error) {
@@ -161,7 +155,7 @@ export async function collectPages(
       }).catch(() => undefined);
       emit({ type: 'step', sourceId: primary.sourceId, action: 'hold_for_viewer', url: primary.url });
       try {
-        await holdForViewer(2_000, combinedSignal);
+        await holdForViewer(8_000, combinedSignal);
       } catch {
         /* snapshots are already stored */
       }
@@ -199,12 +193,19 @@ async function collectTarget(
   emit: (signal: BrowserSignal) => void,
   countStep: () => void,
   pages: PageSnapshot[],
-  credentials: SiteCredential[],
+  resolveCredential: CredentialResolver | undefined,
 ): Promise<void> {
   if (target.access === 'unconfigured') {
     throw new BrowserTargetError(
       'UNSUPPORTED_SOURCE',
       'This source has not been configured for browser access.',
+      false,
+    );
+  }
+  if (target.access === 'authorized' && resolveCredential === undefined) {
+    throw new BrowserTargetError(
+      'AUTH_REQUIRED',
+      'This source requires a credential saved for its exact login domain.',
       false,
     );
   }
@@ -231,45 +232,47 @@ async function collectTarget(
     .catch(() => undefined);
   throwIfAborted(signal);
 
-  const finalUrl = assertAllowedUrl(page.url(), target.allowedHosts);
-  const body = await page.locator('body').innerText({ timeout: 5_000 });
-  const title = await page.title();
-  const status = response?.status() ?? null;
+  let currentUrl = page.url();
+  let body = await page.locator('body').innerText({ timeout: 5_000 });
+  let title = await page.title();
+  let status = response?.status() ?? null;
 
   if (looksBlocked(status, title, body)) {
     throw new BrowserTargetError('ACCESS_BLOCKED', 'The source returned an access check or block page.', true);
   }
-  let capturedUrl = finalUrl;
-  let signedIn = false;
-  const credential = credentialForHost(credentials, finalUrl.host);
-  const loginForm = await pageHasLoginForm(page);
-  if (looksLikeAuthentication(status, finalUrl.href) || loginForm) {
-    if (credential) {
-      countStep();
-      emit({ type: 'step', sourceId: target.id, action: 'sign_in', url: finalUrl.href });
-      const filled = await fillLoginForm(page, credential, signal);
-      throwIfAborted(signal);
-      if (filled) {
-        await page.locator('body').waitFor({ timeout: 5_000 }).catch(() => undefined);
-      }
-      const afterUrl = new URL(page.url());
-      const stillLogin = looksLikeAuthentication(null, afterUrl.href) || (await pageHasLoginForm(page));
-      if (stillLogin) {
-        throw new BrowserTargetError('AUTH_REQUIRED', 'The keychain sign-in did not leave the login page.', false);
-      }
-      capturedUrl = assertAllowedUrl(afterUrl.href, target.allowedHosts);
-      signedIn = true;
-    } else if (looksLikeAuthentication(status, finalUrl.href)) {
-      emit({ type: 'step', sourceId: target.id, action: 'hold_for_viewer', url: finalUrl.href });
+
+  let authenticated = false;
+  if (target.access === 'authorized' || looksLikeAuthentication(status, currentUrl)) {
+    if (resolveCredential === undefined) {
+      throw new BrowserTargetError('AUTH_REQUIRED', 'No credential resolver is configured.', false);
+    }
+    countStep();
+    emit({ type: 'step', sourceId: target.id, action: 'credential_login', url: currentUrl });
+    const login = await attemptCredentialLogin(page, target, resolveCredential, signal);
+    if (login.status !== 'authenticated') {
+      emit({ type: 'step', sourceId: target.id, action: 'hold_for_viewer', url: currentUrl });
       try {
         await holdForViewer(2_000, signal);
       } catch {
         /* still report the login wall */
       }
-      throw new BrowserTargetError('AUTH_REQUIRED', 'The source redirected to an authentication page.', false);
+      const message = login.status === 'credential_missing'
+        ? 'No credential is saved for this portal or its sign-in host.'
+        : 'The login form requires manual sign-in, MFA, or a site-specific adapter.';
+      throw new BrowserTargetError('AUTH_REQUIRED', message, false);
     }
+    authenticated = true;
+    currentUrl = login.url;
+    body = await page.locator('body').innerText({ timeout: 5_000 });
+    title = await page.title();
+    status = null;
   }
-  if (!signedIn && status !== null && status >= 400) {
+
+  const capturedUrl = assertAllowedUrl(currentUrl, target.allowedHosts);
+  if (!authenticated && looksLikeAuthentication(status, capturedUrl.href)) {
+    throw new BrowserTargetError('AUTH_REQUIRED', 'The source remained on an authentication page.', false);
+  }
+  if (status !== null && status >= 400) {
     throw new BrowserTargetError('NAVIGATION_FAILED', `The source returned HTTP ${status}.`, status >= 500);
   }
 
@@ -302,9 +305,9 @@ async function collectTarget(
   };
   pages.push(snapshot);
   emit({ type: 'page_read', snapshot });
-  emit({ type: 'step', sourceId: target.id, action: 'hold_for_viewer', url: finalUrl.href });
+  emit({ type: 'step', sourceId: target.id, action: 'hold_for_viewer', url: capturedUrl.href });
   try {
-    await holdForViewer(2_000, signal);
+    await holdForViewer(3_000, signal);
   } catch {
     // The page is already captured; a cancelled hold must not drop the snapshot.
   }

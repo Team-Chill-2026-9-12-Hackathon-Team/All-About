@@ -4,7 +4,7 @@ import { isIP } from 'node:net';
 const BLOCKED_TEXT =
   /verifying you are human|verify you are human|just a moment|access denied|pardon our interruption/i;
 const AUTH_HOST_OR_PATH =
-  /weblogin|login\.microsoftonline|\/login(?:[/?#]|$)|\/signin(?:[/?#]|$)/i;
+  /weblogin|utorauth\.utoronto\.ca|login\.microsoftonline|\/login(?:[/?#]|$)|\/signin(?:[/?#]|$)/i;
 
 export interface PageReadResult {
   title: string;

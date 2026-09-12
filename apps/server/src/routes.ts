@@ -13,6 +13,8 @@ import {
 } from "@allabout/contracts";
 import type { FastifyInstance, FastifyReply } from "fastify";
 
+import { answerToIcs } from "./calendar.js";
+import { inheritParentQuery } from "./follow-up.js";
 import {
   ActiveRunConflictError,
   InvalidEventCursorError,
@@ -125,8 +127,20 @@ export function registerRunRoutes(
       );
     }
 
+    let input = parsedInput.data;
+    if (input.parentRunId) {
+      try {
+        input = inheritParentQuery(input, runStore.getInput(input.parentRunId));
+      } catch (error) {
+        if (error instanceof RunNotFoundError) {
+          return sendError(reply, 404, "RUN_NOT_FOUND", "The parent run was not found.");
+        }
+        throw error;
+      }
+    }
+
     try {
-      const run = runStore.create(parsedInput.data);
+      const run = runStore.create(input);
       if (dependencies.onRunCreated !== undefined) {
         queueMicrotask(() => dependencies.onRunCreated?.(run.runId));
       }
@@ -157,6 +171,32 @@ export function registerRunRoutes(
     }
     try {
       return RunSnapshotSchema.parse(runStore.getSnapshot(runId));
+    } catch (error) {
+      if (error instanceof RunNotFoundError) {
+        return sendError(reply, 404, "RUN_NOT_FOUND", "Run not found.");
+      }
+      throw error;
+    }
+  });
+
+  app.get<{ Params: { id: string } }>("/api/runs/:id/calendar.ics", async (request, reply) => {
+    const runId = getRunId(request.params);
+    if (runId === null) {
+      return sendError(reply, 400, "INVALID_RUN_ID", "A run ID is required.");
+    }
+    try {
+      const snapshot = runStore.getSnapshot(runId);
+      if (!snapshot.answer) {
+        return sendError(reply, 409, "ANSWER_NOT_READY", "This run does not have confirmed dates yet.");
+      }
+      const ics = answerToIcs(snapshot.answer);
+      if (!ics) {
+        return sendError(reply, 409, "NO_CONFIRMED_DATES", "No confirmed key dates are available to export.");
+      }
+      return reply
+        .header("content-type", "text/calendar; charset=utf-8")
+        .header("content-disposition", `attachment; filename="${runId}.ics"`)
+        .send(ics);
     } catch (error) {
       if (error instanceof RunNotFoundError) {
         return sendError(reply, 404, "RUN_NOT_FOUND", "Run not found.");
@@ -279,6 +319,7 @@ export function registerRunRoutes(
           connection: "keep-alive",
           "x-accel-buffering": "no",
         });
+        reply.raw.flushHeaders?.();
         request.raw.once("close", unsubscribe);
         for (const event of subscription.replay) {
           sendEvent(event);

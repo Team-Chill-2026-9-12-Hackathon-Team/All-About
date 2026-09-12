@@ -58,9 +58,23 @@ npm run smoke --prefix packages/browser
 
 网站范围按 exact host 登记，不能简单允许所有 utoronto.ca 后缀。CS 官方域名是 web.cs.toronto.edu；Hart House 为 harthouse.ca。遇到链接/重定向时必须重新校验目标。
 
+## 2026-09-12 活动详情页（本轮）
+
+Hart House / Xplore 详情页当前会被 Cloudflare 拦截，不能当作本轮稳定 live 源。
+
+本轮主选（校园活动备用，不是学生社团）：
+- URL：https://alumni.utoronto.ca/events/labour-day-carillon-recital-0
+- sourceId：`alumni-carillon-recital`
+- allowedHosts：`alumni.utoronto.ca`
+- 正文含活动名、2026-09-07、3:00–4:00PM EDT、Soldiers' Tower / 7 Hart House Circle、free / open to the public
+- 快照：`packages/browser/test/fixtures/alumni-carillon-recital.live.json`（历史 live 抓取；重放不是新的 live run）
+- 命令：`npm run smoke:event --prefix packages/browser`
+- 抓取后会 `hold_for_viewer` 5 秒，让 A 能看见真实页面
+- 已知不稳定：Hart House Cloudflare；UofT Events 列表会混多个活动，不能当单场详情
+
 ## 推荐首个活动 demo
 
-当前稳定保底问题：Xplore Hart House 什么时候、在哪里，是否列为 UTSG 活动？
+当前稳定保底问题：Labour Day Carillon Recital 什么时候、在哪里，是否免费？
 
 1. [UofT 活动列表](https://www.utoronto.ca/events)把 Xplore 列在 U of T St. George 下并给出日期。
 2. [活动详情](https://harthouse.ca/events/xplore-hart-house/)提供日期、地点、活动时段及参与对象。

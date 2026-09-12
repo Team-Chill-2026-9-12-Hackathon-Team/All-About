@@ -1,49 +1,47 @@
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildApp } from "./app.js";
+import { decodeCredentialVaultKey, FileCredentialVault } from "./credential-vault.js";
 import { loadRootEnvironment, readServerConfig } from "./config.js";
 import { createRunRuntime } from "./runtime.js";
 import { liveSourceRegistry } from "./source-registry.js";
-import { VaultStore } from "./vault-store.js";
 
 loadRootEnvironment();
 
 const serverConfig = readServerConfig();
-const vaultStore = new VaultStore({
-  filePath:
-    process.env.VAULT_FILE ??
-    fileURLToPath(new URL("../../../.data/vault.enc", import.meta.url)),
-  masterKey: process.env.VAULT_MASTER_KEY ?? "allabout-dev-vault-key",
+const credentialVault = createLocalCredentialVault();
+const runtime = createRunRuntime({
+  sources: liveSourceRegistry,
+  ...(serverConfig.openAiApiKey ? { apiKey: serverConfig.openAiApiKey } : {}),
+  ...(serverConfig.openAiModel ? { model: serverConfig.openAiModel } : {}),
+  ...(credentialVault
+    ? { resolveCredential: (domain: string) => credentialVault.resolve(domain) }
+    : {}),
 });
-const runtime =
-  serverConfig.openAiApiKey !== undefined &&
-  serverConfig.openAiModel !== undefined &&
-  serverConfig.steelConfigured
-    ? createRunRuntime({
-        sources: liveSourceRegistry,
-        apiKey: serverConfig.openAiApiKey,
-        model: serverConfig.openAiModel,
-        vaultStore,
-      })
-    : undefined;
-const app =
-  runtime === undefined
-    ? buildApp({ logger: true }, { sources: liveSourceRegistry, vaultStore })
-    : buildApp({ logger: true }, { ...runtime, vaultStore });
+const app = buildApp(
+  { logger: true },
+  {
+    ...runtime,
+    ...(credentialVault ? { credentialVault } : {}),
+  },
+);
 
 if (!serverConfig.openAiConfigured) {
   app.log.warn(
-    "OPENAI_API_KEY and OPENAI_MODEL are both required for run execution; health checks and source discovery remain available.",
+    "OPENAI_API_KEY and OPENAI_MODEL are missing; allowlisted sourceIds use the default plan.",
   );
 }
 if (!serverConfig.steelConfigured) {
   app.log.warn(
-    "STEEL_API_KEY is required for live browsing; health checks and source discovery remain available.",
+    "STEEL_API_KEY is missing; LIVE_WEB collection will fail, DEMO101 LIVE_FIXTURE still runs locally.",
   );
 }
-if (runtime === undefined) {
+if (credentialVault === undefined) {
   app.log.warn(
-    "Run execution dependencies are incomplete; POST /api/runs will return 503.",
+    "CREDENTIAL_VAULT_KEY is not configured; keychain endpoints and automatic login are unavailable.",
   );
 }
 
@@ -52,4 +50,24 @@ try {
 } catch (error) {
   app.log.error(error);
   process.exitCode = 1;
+}
+
+function createLocalCredentialVault(): FileCredentialVault | undefined {
+  const configured = process.env.CREDENTIAL_VAULT_KEY?.trim();
+  const keyFile = fileURLToPath(new URL("../../../.data/credential-vault.key", import.meta.url));
+  let encoded = configured;
+  if (!encoded) {
+    try {
+      encoded = readFileSync(keyFile, "utf8").trim();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      encoded = randomBytes(32).toString("base64");
+      mkdirSync(dirname(keyFile), { recursive: true, mode: 0o700 });
+      writeFileSync(keyFile, `${encoded}\n`, { mode: 0o600 });
+    }
+  }
+  const vaultPath =
+    process.env.CREDENTIAL_VAULT_PATH?.trim() ||
+    fileURLToPath(new URL("../../../.data/credential-vault.json", import.meta.url));
+  return new FileCredentialVault(vaultPath, decodeCredentialVaultKey(encoded));
 }

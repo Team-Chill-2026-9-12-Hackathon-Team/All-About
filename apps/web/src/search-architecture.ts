@@ -30,10 +30,13 @@ export function classifyQuestion(question: string): QueryKind {
 export function detectSearch(question: string): SearchBlueprint {
   const kind = classifyQuestion(question);
   const match = question.match(COURSE_RE);
+  const isDemo101 = /demo\s?-?\s?101/i.test(question);
   const isCsc207 = /\bcsc\s?-?\s?207\b/i.test(question);
   const isCsc148 = /\bcsc\s?-?\s?148\b/i.test(question);
   const isCarillon = /carillon|labour day|soldiers.? tower/i.test(question);
-  const course = isCsc207
+  const course = isDemo101
+    ? 'DEMO101'
+    : isCsc207
     ? 'CSC207H1'
     : isCsc148
       ? 'CSC148H1'
@@ -54,12 +57,14 @@ export function detectSearch(question: string): SearchBlueprint {
       sourceIds.push('uoft-events', 'student-life-events', 'hart-house-events');
     }
   } else if (kind === 'assignment') {
-    if (isCsc207 || course === 'CSC207H1') {
-      sourceIds.push('academic-calendar-csc207', 'reddit-uoft-csc207', 'piazza-login');
+    if (isDemo101 || course === 'DEMO101') {
+      sourceIds.push('demo101-syllabus', 'demo101-announcement', 'demo101-student-discussion');
+    } else if (isCsc207 || course === 'CSC207H1') {
+      sourceIds.push('academic-calendar-csc207', 'piazza-login', 'quercus-login');
     } else if (isCsc148 || course === 'CSC148H1') {
-      sourceIds.push('academic-calendar-csc148', 'reddit-uoft', 'piazza-login');
+      sourceIds.push('academic-calendar-csc148', 'piazza-login', 'quercus-login');
     } else {
-      sourceIds.push('academic-calendar-csc207', 'reddit-uoft', 'piazza-login');
+      sourceIds.push('academic-calendar-csc207', 'piazza-login', 'quercus-login');
     }
   } else if (kind === 'course') {
     if (isCsc207 || course === 'CSC207H1') {
@@ -84,6 +89,8 @@ export function detectSearch(question: string): SearchBlueprint {
       ? (isCarillon ? 'Labour Day Carillon Recital' : null)
       : kind === 'exam'
         ? 'final-exams'
+        : isDemo101 || course === 'DEMO101'
+          ? 'Assignment 2'
         : null,
   };
 }

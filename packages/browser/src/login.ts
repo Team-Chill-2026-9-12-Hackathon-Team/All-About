@@ -1,7 +1,10 @@
 import type { Page } from "playwright";
 import type { SourceConfig } from "@allabout/contracts";
 
+import { isAllowedLoginHost, loginHostsFor } from "./login-hosts.js";
 import { assertAllowedUrl, looksLikeAuthentication } from "./page-tools.js";
+
+export { isAllowedLoginHost, loginHostsFor, UOFT_SSO_HOSTS } from "./login-hosts.js";
 
 export interface BrowserCredential {
   username: string;
@@ -25,6 +28,11 @@ const USERNAME_SELECTOR = [
   'input[name*="email" i]',
 ].map((selector) => `${selector}:visible`).join(", ");
 
+const MFA_TEXT =
+  /two[- ]factor|multi[- ]factor|verification code|authenticator|security code|duo|utormfa|approve the request/i;
+
+const CONTENT_WAIT_MS = 15_000;
+
 export async function attemptCredentialLogin(
   page: Page,
   target: SourceConfig,
@@ -32,13 +40,11 @@ export async function attemptCredentialLogin(
   signal: AbortSignal,
 ): Promise<LoginResult> {
   throwIfAborted(signal);
-  let loginUrl: URL;
-  try {
-    loginUrl = assertAllowedUrl(page.url(), target.allowedHosts);
-  } catch {
+  const loginUrl = parseHttpsUrl(page.url());
+  if (!loginUrl || !isAllowedLoginHost(loginUrl.hostname, target)) {
     return { status: "form_unsupported" };
   }
-  const credential = await resolveCredential(loginUrl.hostname);
+  const credential = await resolveCredentialForSource(loginUrl.hostname, target, resolveCredential);
   if (!credential) return { status: "credential_missing" };
 
   const password = page.locator('input[type="password"]:visible').first();
@@ -52,7 +58,7 @@ export async function attemptCredentialLogin(
     const action = await form.getAttribute("action");
     if (action) {
       const submitUrl = new URL(action, loginUrl);
-      if (submitUrl.hostname.toLowerCase() !== loginUrl.hostname.toLowerCase()) {
+      if (!isAllowedLoginHost(submitUrl.hostname, target)) {
         return { status: "form_unsupported" };
       }
     }
@@ -66,15 +72,68 @@ export async function attemptCredentialLogin(
   await page.waitForTimeout(500);
   throwIfAborted(signal);
 
-  const finalUrl = page.url();
-  const stillHasPassword = (await page.locator('input[type="password"]:visible').count()) > 0;
-  const body = await page.locator("body").innerText({ timeout: 5_000 }).catch(() => "");
-  const needsSecondFactor = /two[- ]factor|multi[- ]factor|verification code|authenticator|security code/i.test(body);
-  if ((looksLikeAuthentication(null, finalUrl) && stillHasPassword) || needsSecondFactor) {
-    return { status: "form_unsupported" };
+  if (await pageShowsMfa(page)) return { status: "form_unsupported" };
+
+  const contentUrl = await waitForContentHost(page, target, signal);
+  if (!contentUrl) return { status: "form_unsupported" };
+  return { status: "authenticated", url: contentUrl };
+}
+
+async function resolveCredentialForSource(
+  hostname: string,
+  target: SourceConfig,
+  resolveCredential: CredentialResolver,
+): Promise<BrowserCredential | null> {
+  const candidates = uniqueHosts([hostname, ...loginHostsFor(target)]);
+  for (const host of candidates) {
+    const credential = await resolveCredential(host);
+    if (credential) return credential;
   }
-  assertAllowedUrl(finalUrl, target.allowedHosts);
-  return { status: "authenticated", url: finalUrl };
+  return null;
+}
+
+async function waitForContentHost(
+  page: Page,
+  target: SourceConfig,
+  signal: AbortSignal,
+): Promise<string | null> {
+  const deadline = Date.now() + CONTENT_WAIT_MS;
+  while (Date.now() < deadline) {
+    throwIfAborted(signal);
+    const captured = contentUrlIfReady(page.url(), target);
+    if (captured) return captured;
+    if (await pageShowsMfa(page)) return null;
+    await page.waitForTimeout(250);
+  }
+  return contentUrlIfReady(page.url(), target);
+}
+
+function contentUrlIfReady(rawUrl: string, target: SourceConfig): string | null {
+  try {
+    const url = assertAllowedUrl(rawUrl, target.allowedHosts);
+    if (looksLikeAuthentication(null, url.href)) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+async function pageShowsMfa(page: Page): Promise<boolean> {
+  const body = await page.locator("body").innerText({ timeout: 5_000 }).catch(() => "");
+  return MFA_TEXT.test(body);
+}
+
+function parseHttpsUrl(rawUrl: string): URL | null {
+  try {
+    const url = new URL(rawUrl);
+    return url.protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+function uniqueHosts(hosts: readonly string[]): string[] {
+  return [...new Set(hosts.map((host) => host.trim().toLowerCase()).filter(Boolean))];
 }
 
 function throwIfAborted(signal: AbortSignal): void {

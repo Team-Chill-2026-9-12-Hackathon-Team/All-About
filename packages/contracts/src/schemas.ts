@@ -250,6 +250,7 @@ export const RunSnapshotSchema = z.strictObject({
   answer: AnswerBundleSchema.nullable(),
   lastSeq: z.number().int().nonnegative(),
   cleanup: CleanupStateSchema.nullable(),
+  viewerUrl: z.string().url().nullable(),
 });
 
 export const ClarificationRequestSchema = z.strictObject({

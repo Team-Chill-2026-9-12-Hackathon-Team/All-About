@@ -1,5 +1,7 @@
 import { SourceConfigSchema, type SourceConfig } from "@allabout/contracts";
 
+import { demo101Sources } from "./demo101-fixtures.js";
+
 const candidateSources = [
   {
     id: "academic-calendar-csc207",
@@ -152,7 +154,7 @@ const candidateSources = [
       entity: null,
     },
     contentMode: "live",
-    access: "public",
+    access: "authorized",
   },
   {
     id: "artsci-exam-conflicts",
@@ -289,7 +291,7 @@ const candidateSources = [
       entity: null,
     },
     contentMode: "live",
-    access: "public",
+    access: "authorized",
   },
   {
     id: "acorn-login",
@@ -306,8 +308,9 @@ const candidateSources = [
       entity: null,
     },
     contentMode: "live",
-    access: "public",
+    access: "authorized",
   },
+  ...demo101Sources,
 ] satisfies SourceConfig[];
 
 export const liveSourceRegistry = SourceConfigSchema.array()

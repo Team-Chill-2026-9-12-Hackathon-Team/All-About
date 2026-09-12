@@ -3,7 +3,7 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import type { QueryInput, QueryPlan, SourceConfig } from "@allabout/contracts";
 
-import type { ClarificationPlan, RunPlanner } from "./run-executor.js";
+import { browserPlanBudget, type ClarificationPlan, type RunPlanner } from "./run-executor.js";
 
 const scopeFieldSchema = z.enum([
   "school",
@@ -144,7 +144,7 @@ export function materializePlannerDecision(
     input,
     targets,
     requestedFields: [...requestedFields],
-    budget: { maxPages: 3, maxSteps: 8, timeoutMs: 90_000 },
+    budget: browserPlanBudget(targets),
   };
 }
 
@@ -173,7 +173,7 @@ export function createOpenAiRunPlanner({
         model,
         store: false,
         instructions:
-          "Route the campus question only to IDs in the supplied source catalog and select factual requested fields, not UI section names. Prefer up to three distinct pages across official, community, and discussion sources. Never select a course calendar whose course code differs from the asked course. Do not invent URLs or facts. If Piazza or Reddit cannot answer a due date, still include them so the run can show a login wall or student discussion. Ask one concise clarification only when scope ambiguity prevents safe source selection.",
+          "Route the campus question only to IDs in the supplied source catalog and select factual requested fields, not UI section names. Prefer up to three distinct pages. For assignment due dates prefer the matching course calendar plus Piazza and Quercus when those IDs exist. Never select a course calendar whose course code differs from the asked course. Do not invent URLs or facts. Authorized sources may auto-login from the keychain; still select them when they can hold the answer. Ask one concise clarification only when scope ambiguity prevents safe source selection.",
         input: JSON.stringify({ queryInput: input, sourceCatalog }),
         text: { format: zodTextFormat(PlannerDecisionSchema, "campus_query_plan") },
       },

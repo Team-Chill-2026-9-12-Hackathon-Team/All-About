@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildQueryInput, classifyQuestion } from '../src/live.ts';
+import { buildQueryInput, classifyQuestion, pagesFromAnswer } from '../src/live.ts';
 import { COVERAGE_CATALOG, coverageForKind } from '../src/coverage-catalog.ts';
 import { detectSearch, searchPhase } from '../src/search-architecture.ts';
 
@@ -36,13 +36,13 @@ describe('question routing', () => {
     ]);
   });
 
-  it('keeps assignment questions on public calendars', () => {
+  it('opens Piazza and Quercus for assignment due dates', () => {
     assert.equal(classifyQuestion('When is CSC207 Assignment 2 due?'), 'assignment');
     const input = buildQueryInput('When is CSC207 Assignment 2 due?');
     assert.deepEqual(input.sourceIds, [
       'academic-calendar-csc207',
-      'reddit-uoft-csc207',
       'piazza-login',
+      'quercus-login',
     ]);
     assert.equal(input.scope.course, 'CSC207H1');
   });
@@ -64,6 +64,15 @@ describe('fixed search architecture', () => {
       assert.equal(searchPhase('browsing', 1, true), 'gather');
       assert.equal(searchPhase('completed', 1, true), 'answer');
     }
+  });
+
+  it('turns answer sources into captured pages after a missed live event', () => {
+    const pages = pagesFromAnswer({
+      sources: [
+        {sourceId: 'academic-calendar-csc207', title: 'CSC207H1', url: 'https://artsci.calendar.utoronto.ca/course/csc207h1'},
+      ],
+    });
+    assert.deepEqual(pages.map((page) => page.sourceId), ['academic-calendar-csc207']);
   });
 
   it('gives every catalog site a coverage solution', () => {

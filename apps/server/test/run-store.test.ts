@@ -39,6 +39,7 @@ describe("RunStore", () => {
       answer: null,
       lastSeq: 1,
       cleanup: null,
+      viewerUrl: null,
     });
 
     const stream = store.openEventStream("run-1", 0, () => undefined);
@@ -129,7 +130,9 @@ describe("RunStore", () => {
       viewerUrl: "https://viewer.example.test/session",
       interactive: false,
     });
+    expect(store.getSnapshot("run-1").viewerUrl).toBe("https://viewer.example.test/session");
     store.appendEvent("run-1", "viewer_closed", { reason: "released" });
+    expect(store.getSnapshot("run-1").viewerUrl).toBeNull();
     store.transition("run-1", "failed");
 
     expect(store.setCleanup("run-1", "released").cleanup).toBe("released");

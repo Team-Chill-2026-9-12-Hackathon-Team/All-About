@@ -143,7 +143,7 @@ export const COVERAGE_CATALOG: CoverageSite[] = [
     url: 'https://piazza.com/login',
     access: 'login',
     covers: 'Private class discussion',
-    solution: 'UTORid login. We show the wall and do not read private posts. Public calendar covers official facts.',
+    solution: 'Save piazza.com (Piazza password) in the keychain. School SSO can use idpz.utorauth.utoronto.ca. MFA or a school-only button still stops collection.',
   },
   {
     id: 'quercus-login',
@@ -151,7 +151,7 @@ export const COVERAGE_CATALOG: CoverageSite[] = [
     url: 'https://q.utoronto.ca/',
     access: 'login',
     covers: 'Private course announcements',
-    solution: 'UTORid login. We do not use a personal session. Assignment due dates stay unknown unless a public page states them.',
+    solution: 'Save q.utoronto.ca or idpz.utorauth.utoronto.ca. Steel fills UTORid, then waits to return to Quercus. UTORMFA / Duo still requires you.',
   },
   {
     id: 'acorn-login',
@@ -159,7 +159,7 @@ export const COVERAGE_CATALOG: CoverageSite[] = [
     url: 'https://www.acorn.utoronto.ca/',
     access: 'login',
     covers: 'Personal enrolment',
-    solution: 'UTORid login. We do not read personal records. Public sessional dates cover faculty deadlines.',
+    solution: 'Save www.acorn.utoronto.ca or the UofT IdP. Same UTORid fill as Quercus. UTORMFA still blocks a full collect.',
   },
   {
     id: 'ratemyprofessors-uoft',
@@ -168,6 +168,30 @@ export const COVERAGE_CATALOG: CoverageSite[] = [
     access: 'licensed',
     covers: 'Instructor opinions',
     solution: 'Terms require prior permission. We do not scrape reviews. Official calendar stays the course source.',
+  },
+  {
+    id: 'demo101-syllabus',
+    label: 'DEMO101 syllabus',
+    url: 'https://fixture.example.edu/demo101/syllabus',
+    access: 'readable',
+    covers: 'Original fictional A2 deadline',
+    solution: 'Labeled demo fixture. Not a real course page.',
+  },
+  {
+    id: 'demo101-announcement',
+    label: 'DEMO101 announcement',
+    url: 'https://fixture.example.edu/demo101/announcement',
+    access: 'readable',
+    covers: 'Instructor extension',
+    solution: 'Labeled demo fixture. Shows the explicit update.',
+  },
+  {
+    id: 'demo101-student-discussion',
+    label: 'DEMO101 discussion',
+    url: 'https://fixture.example.edu/demo101/discussion',
+    access: 'readable',
+    covers: 'Student memory, not policy',
+    solution: 'Labeled demo fixture. Kept in the experience lane.',
   },
 ];
 
@@ -182,10 +206,10 @@ const BY_KIND: Record<QueryKind, string[]> = {
   ],
   assignment: [
     'academic-calendar-csc207',
-    'reddit-uoft-csc207',
     'piazza-login',
     'quercus-login',
     'acorn-login',
+    'reddit-uoft-csc207',
   ],
   event: [
     'uoft-events',
@@ -214,6 +238,11 @@ export function coverageSite(id: string): CoverageSite | undefined {
 }
 
 export function coverageForKind(kind: QueryKind, course?: string | null): CoverageSite[] {
+  if (course === 'DEMO101') {
+    return ['demo101-syllabus', 'demo101-announcement', 'demo101-student-discussion']
+      .map((id) => coverageSite(id))
+      .filter((site): site is CoverageSite => site !== undefined);
+  }
   const swap148 = course === 'CSC148H1';
   return BY_KIND[kind]
     .map((id) => {

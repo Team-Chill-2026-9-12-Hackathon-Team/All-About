@@ -12,7 +12,7 @@ import {
 } from './live';
 import { coverageForKind, coverageSite } from './coverage-catalog.ts';
 import { SEARCH_PHASES, searchPhase, type SearchPhase } from './search-architecture.ts';
-import { addVaultEntry, listVaultEntries, removeVaultEntry, type VaultPublicEntry } from './vault.ts';
+import { VaultDrawer } from './VaultDrawer';
 import './desk.css';
 
 const starterQuestions = [
@@ -20,6 +20,7 @@ const starterQuestions = [
   {label: 'Event · Labour Day Carillon Recital', question: 'When and where is the Labour Day Carillon Recital, and is it free?'},
   {label: 'Exam · December 2026 exam period', question: 'When is the Arts & Science December 2026 exam period, and what counts as an exam conflict?'},
   {label: 'Assignment · CSC207 A2 due date', question: 'When is CSC207 Assignment 2 due?'},
+  {label: 'Demo · DEMO101 A2 deadline update', question: 'Did the DEMO101 A2 deadline change?'},
 ];
 
 const FIELD_LABEL: Record<string, string> = {
@@ -56,7 +57,7 @@ function compactFacts(answer: AnswerBundle): ClaimRow[] {
     return (left === -1 ? 99 : left) - (right === -1 ? 99 : right);
   });
   for (const claim of sorted) {
-    if (claim.status === 'unknown' || claim.field === 'community_note') continue;
+    if (claim.status === 'unknown' || claim.status === 'superseded' || claim.status === 'conflict' || claim.field === 'community_note') continue;
     if (claim.text.length < 28 || /visible link|https?:\/\//i.test(claim.text) || /^ca\//i.test(claim.text)) continue;
     if (claim.field === 'event_description' && rows.some((row) => row.field === 'event_description')) continue;
     const key = `${claim.field}:${claim.text.slice(0, 80)}`;
@@ -66,6 +67,16 @@ function compactFacts(answer: AnswerBundle): ClaimRow[] {
     if (rows.length >= 4) break;
   }
   return rows;
+}
+
+function isSteelViewerUrl(url?: string | null): boolean {
+  if (!url) return false;
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host === 'steel.dev' || host.endsWith('.steel.dev');
+  } catch {
+    return false;
+  }
 }
 
 function pageChip(url?: string): string | undefined {
@@ -95,6 +106,11 @@ interface SitePane {
 function sitePanes(run: LiveRun): SitePane[] {
   const planned = detectSearch(run.question).sourceIds;
   const captured = new Map(run.capturedPages.map((page) => [page.sourceId, page]));
+  for (const source of run.answer?.sources ?? []) {
+    if (!captured.has(source.sourceId)) {
+      captured.set(source.sourceId, {title: source.title, url: source.url, sourceId: source.sourceId});
+    }
+  }
   const failed = new Map(
     run.activities.filter((item) => item.kind === 'failed' && item.sourceId).map((item) => [item.sourceId!, item]),
   );
@@ -159,23 +175,59 @@ function Cite({answer, id, onCite}: {answer: AnswerBundle; id: string; onCite: (
   );
 }
 
+function DeadlineDetective({
+  answer,
+  onCite,
+}: {
+  answer: AnswerBundle;
+  onCite: (id: string) => void;
+}) {
+  const update = answer.conflicts.find((item) => item.resolution === 'explicit_update' && item.selectedClaimId);
+  if (!update || !update.selectedClaimId) return null;
+  const next = answer.claims.find((claim) => claim.id === update.selectedClaimId);
+  const previous = answer.claims.find((claim) => update.claimIds.includes(claim.id) && claim.id !== update.selectedClaimId);
+  if (!next) return null;
+  return (
+    <div className="date-update" role="status">
+      <span>
+        <small>Was</small>
+        <del>{previous ? clip(previous.text, 80) : 'Earlier deadline'}</del>
+      </span>
+      <ArrowRight size={14} />
+      <span>
+        <small>Now</small>
+        <b>{clip(next.text, 90)}</b>
+        {next.evidenceIds.slice(0, 1).map((id) => (
+          <Cite key={id} answer={answer} id={id} onCite={onCite} />
+        ))}
+      </span>
+      <small>{clip(update.explanation, 90)}</small>
+    </div>
+  );
+}
+
 function AnswerView({
   answer,
   question,
+  runId,
   onCite,
+  onFollowUp,
   citationsOpen,
   expanded,
   onToggleCitations,
 }: {
   answer: AnswerBundle;
   question: string;
+  runId: string;
   onCite: (id: string) => void;
+  onFollowUp: (question: string) => void;
   citationsOpen: boolean;
   expanded: string | null;
   onToggleCitations: (open: boolean) => void;
 }) {
   const facts = compactFacts(answer);
   const pages = [...new Set(answer.sources.map((source) => source.url))];
+  const canExport = answer.keyDates.some((item) => item.status === 'confirmed');
   const missingDue = classifyQuestion(question) === 'assignment' && !facts.some((fact) => fact.field === 'deadline');
   const unknown = missingDue
     ? 'Assignment due dates are not on the public calendar, Reddit thread, or Piazza login wall we opened.'
@@ -190,6 +242,7 @@ function AnswerView({
   return (
     <div className="answer answer-card">
       <p className="answer-lead">{lead}</p>
+      <DeadlineDetective answer={answer} onCite={onCite} />
       <ul className="fact-list">
         {facts.slice(1).map((fact) => (
           <li key={fact.id}>
@@ -210,8 +263,15 @@ function AnswerView({
         <p className="unknowns">Not on these pages: {clip(unknown, 140)}</p>
       )}
       {answer.communityNotes[0] && (
-        <p className="community-note">Reddit / student note: {clip(answer.communityNotes[0].text, 160)}</p>
+        <p className="community-note">Student note, not policy: {clip(answer.communityNotes[0].text, 160)}</p>
       )}
+      {canExport && (
+        <a className="retry" href={`/api/runs/${runId}/calendar.ics`}>Download confirmed dates (.ics)</a>
+      )}
+      <div className="follow-ups">
+        <button type="button" className="starter" onClick={() => onFollowUp('What is the late penalty for this assignment?')}>What about the late penalty?</button>
+        <button type="button" className="starter" onClick={() => onFollowUp('What is the submission format?')}>Keep this course · submission format</button>
+      </div>
       <p className="answer-foot">
         <Check size={12} />
         {pages.length} page{pages.length === 1 ? '' : 's'} · {answer.evidence.length} quote{answer.evidence.length === 1 ? '' : 's'}
@@ -265,11 +325,6 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
   const [clarifyText, setClarifyText] = useState('');
   const [archPhase, setArchPhase] = useState<SearchPhase>('detect');
   const [vaultOpen, setVaultOpen] = useState(false);
-  const [vaultEntries, setVaultEntries] = useState<VaultPublicEntry[]>([]);
-  const [vaultHost, setVaultHost] = useState('piazza.com');
-  const [vaultUser, setVaultUser] = useState('');
-  const [vaultPassword, setVaultPassword] = useState('');
-  const [vaultError, setVaultError] = useState('');
   const feed = useRef<HTMLDivElement>(null);
   const chat = useRef<HTMLDivElement>(null);
   const dialog = useRef<HTMLElement>(null);
@@ -309,10 +364,6 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
   useEffect(() => {
     if (run && run.id !== 'detecting') persist(run);
   }, [run?.id, run?.status]);
-  useEffect(() => {
-    void listVaultEntries().then(setVaultEntries).catch(() => undefined);
-  }, []);
-
   useEffect(() => {
     if (!run) {
       setArchPhase('detect');
@@ -387,7 +438,7 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
     }
   }, [run?.activities.length, activityOpen, liveScroll]);
 
-  const start = async (question: string) => {
+  const start = async (question: string, options?: { parentRunId?: string }) => {
     if (!question.trim() || (active && run?.status === 'cancelling')) return;
     setInput('');
     setExpanded(null);
@@ -397,7 +448,7 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
     setDrawer(false);
     setClarifyText('');
     chat.current?.scrollTo({top: 0});
-    await live.start(question);
+    await live.start(question, options);
   };
 
   const reset = async () => {
@@ -462,16 +513,15 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
           <span className="mode-chip" aria-label="Run mode">{run?.mode ?? 'LIVE_WEB'}</span>
           <button
             className={`history-trigger ${vaultOpen ? 'is-active' : ''}`}
+            aria-label="Open password vault"
             aria-expanded={vaultOpen}
             onClick={() => {
               setVaultOpen(true);
+              setDrawer(false);
               setSettings(false);
-              void listVaultEntries().then(setVaultEntries).catch((error: unknown) => {
-                setVaultError(error instanceof Error ? error.message : 'Keychain unavailable.');
-              });
             }}
           >
-            <KeyRound size={16} />Keychain{vaultEntries.length > 0 && <span className="count">{vaultEntries.length}</span>}
+            <KeyRound size={16} />Keychain
           </button>
           <button
             className={`history-trigger ${drawer ? 'is-active' : ''}`}
@@ -646,7 +696,9 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
                   <AnswerView
                     answer={run.answer}
                     question={run.question}
+                    runId={run.id}
                     onCite={cite}
+                    onFollowUp={(next) => void start(next, { parentRunId: run.id })}
                     citationsOpen={citationsOpen}
                     expanded={expanded}
                     onToggleCitations={setCitationsOpen}
@@ -696,11 +748,27 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
             </div>
             <small>{run?.mode ?? 'LIVE'}</small>
           </div>
-          <div className={`browser-stage ${run ? 'has-live is-split' : ''}`}>
+          <div className={`browser-stage ${run ? 'has-live' : ''} ${run && isSteelViewerUrl(run.viewerUrl) && !run.viewerClosed ? 'is-projecting' : run ? 'is-split' : ''}`}>
             {run ? (
+              isSteelViewerUrl(run.viewerUrl) && !run.viewerClosed ? (
+                <div className="live-frame" data-testid="steel-live-frame">
+                  <iframe
+                    src={run.viewerUrl ?? undefined}
+                    title="Steel live browser"
+                    sandbox="allow-scripts allow-same-origin allow-forms"
+                    referrerPolicy="no-referrer"
+                    tabIndex={-1}
+                  />
+                  <div className="gather-overlay">
+                    <span className="gather-kicker">LIVE STEEL SESSION</span>
+                    <strong>{panes.find((pane) => pane.state === 'live')?.label ?? 'Opening the live page'}</strong>
+                    <small>{latestUrl ?? run.currentUrl ?? 'Connecting the cloud browser to the public page.'}</small>
+                    <i className="gather-scan" />
+                  </div>
+                </div>
+              ) : (
               <div className="split-screen" data-count={Math.max(panes.length, 1)}>
                 {panes.map((pane) => {
-                  const liveHere = pane.state === 'live' && run.viewerUrl && !run.viewerClosed;
                   const quote = run.answer?.sources.some((source) => source.sourceId === pane.id)
                     ? run.answer.evidence.find((item) => run.answer?.sources.some((source) => source.id === item.snapshotId && source.sourceId === pane.id))?.quote
                     : undefined;
@@ -713,34 +781,21 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
                       </div>
                       <div className="split-address">{pane.url || 'Waiting'}</div>
                       <div className="split-body">
-                        {liveHere ? (
-                          <iframe
-                            src={run.viewerUrl ?? undefined}
-                            title={`${pane.label} live`}
-                            sandbox="allow-scripts allow-same-origin"
-                            referrerPolicy="no-referrer"
-                            tabIndex={-1}
-                          />
-                        ) : pane.state === 'captured' && pane.url ? (
-                          <iframe
-                            src={pane.url}
-                            title={pane.title ?? pane.label}
-                            sandbox="allow-scripts allow-same-origin"
-                            referrerPolicy="no-referrer"
-                            tabIndex={-1}
-                          />
-                        ) : (
-                          <div className="split-fallback">
-                            <b>{pane.title ?? pane.label}</b>
-                            <p>{pane.detail ?? (pane.state === 'waiting' ? 'Opening this site next.' : 'This site blocked the live reader or requires login.')}</p>
-                          </div>
-                        )}
-                        {quote && <blockquote>{clip(quote, 140)}</blockquote>}
+                        <div className="split-fallback">
+                          <b>{pane.title ?? pane.label}</b>
+                          <p>
+                            {pane.state === 'captured'
+                              ? 'Campus sites block being framed here. The live Steel session is what projects the real page while the run is open.'
+                              : pane.detail ?? (pane.state === 'waiting' ? 'Opening this site next in the Steel session.' : 'This site blocked the live reader or requires login.')}
+                          </p>
+                          {quote && <blockquote>{clip(quote, 140)}</blockquote>}
+                        </div>
                       </div>
                     </section>
                   );
                 })}
               </div>
+              )
             ) : (
               <div className="browser-empty">
                 <div className="window-symbol">
@@ -812,62 +867,7 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
           </aside>
         </div>
       )}
-      {vaultOpen && (
-        <div className="drawer-backdrop" onClick={() => setVaultOpen(false)}>
-          <aside className="history-drawer" role="dialog" aria-modal="true" aria-labelledby="vault-heading" onClick={(e) => e.stopPropagation()}>
-            <div className="drawer-heading">
-              <div><KeyRound size={18} /><h2 id="vault-heading">Keychain</h2></div>
-              <button className="icon-button" aria-label="Close keychain" onClick={() => setVaultOpen(false)}><X size={18} /></button>
-            </div>
-            <p className="history-description">Save your own campus logins by hostname. The agent only uses them on that host, never puts passwords in the answer, and never invents a session.</p>
-            <form
-              className="clarify-box"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void addVaultEntry({ host: vaultHost, username: vaultUser, password: vaultPassword })
-                  .then((entry) => {
-                    setVaultEntries((rows) => [...rows.filter((row) => row.host !== entry.host || row.username !== entry.username), entry]);
-                    setVaultPassword('');
-                    setVaultError('');
-                  })
-                  .catch((error: unknown) => {
-                    setVaultError(error instanceof Error ? error.message : 'Could not save.');
-                  });
-              }}
-            >
-              <input value={vaultHost} onChange={(e) => setVaultHost(e.target.value)} placeholder="piazza.com" aria-label="Site host" required />
-              <input value={vaultUser} onChange={(e) => setVaultUser(e.target.value)} placeholder="Username or email" aria-label="Username" required />
-              <input value={vaultPassword} onChange={(e) => setVaultPassword(e.target.value)} type="password" placeholder="Password" aria-label="Password" required />
-              <button type="submit" className="retry">Save to keychain</button>
-            </form>
-            {vaultError && <p className="transport-error">{vaultError}</p>}
-            <div className="history-list">
-              {vaultEntries.length === 0 ? (
-                <div className="history-empty">
-                  <KeyRound size={25} />
-                  <h3>No campus logins yet.</h3>
-                  <p>Add Piazza, Quercus, or ACORN with the exact hostname.</p>
-                </div>
-              ) : vaultEntries.map((entry) => (
-                <div className="history-item" key={entry.id}>
-                  <span className="history-open">
-                    <KeyRound size={15} />
-                    <span>
-                      {entry.label}
-                      <small>{entry.host} · {entry.username}</small>
-                    </span>
-                  </span>
-                  <button className="delete-history" aria-label={`Remove ${entry.host}`} onClick={() => {
-                    void removeVaultEntry(entry.id).then(() => {
-                      setVaultEntries((rows) => rows.filter((row) => row.id !== entry.id));
-                    });
-                  }}><Trash2 size={14} /></button>
-                </div>
-              ))}
-            </div>
-          </aside>
-        </div>
-      )}
+      <VaultDrawer open={vaultOpen} onClose={() => setVaultOpen(false)} />
       {deleted && (
         <div className="toast" role="status">
           <span>Inquiry removed</span>
@@ -943,6 +943,16 @@ function CampusSetup({onContinue, onLogout}: {onContinue: (features: string[]) =
 }
 
 type AuthMode = 'login' | 'create' | 'verify' | 'forgot';
+const SESSION_KEY = 'allabout-session-until';
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+function readRememberedSession(): boolean {
+  try {
+    return Number(localStorage.getItem(SESSION_KEY)) > Date.now();
+  } catch {
+    return false;
+  }
+}
 
 function AuthGate() {
   const [mode, setMode] = useState<AuthMode>('login');
@@ -950,10 +960,17 @@ function AuthGate() {
   const [method, setMethod] = useState<'email' | 'phone'>('email');
   const [loading, setLoading] = useState(false);
   const [entering, setEntering] = useState(false);
-  const [authenticated, setAuthenticated] = useState(false);
+  const [keepSignedIn, setKeepSignedIn] = useState(true);
+  const [authenticated, setAuthenticated] = useState(readRememberedSession);
   const [features, setFeatures] = useState<string[] | null>(null);
   const [notice, setNotice] = useState('');
-  const enter = () => {
+  const enter = (remember = keepSignedIn) => {
+    try {
+      if (remember) localStorage.setItem(SESSION_KEY, String(Date.now() + THIRTY_DAYS_MS));
+      else localStorage.removeItem(SESSION_KEY);
+    } catch {
+      /* private mode */
+    }
     setEntering(true);
     setTimeout(() => {
       setEntering(false);
@@ -982,6 +999,11 @@ function AuthGate() {
     }, 650);
   };
   const logOut = () => {
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch {
+      /* private mode */
+    }
     setAuthenticated(false);
     setFeatures(null);
     setMode('login');
@@ -1057,6 +1079,12 @@ function AuthGate() {
                 <ArrowRight size={17} />
               </button>
             </form>
+          )}
+          {mode === 'login' && (
+            <label className="remember-session">
+              <input type="checkbox" checked={keepSignedIn} onChange={(e) => setKeepSignedIn(e.target.checked)} />
+              <span>Keep me signed in for 30 days</span>
+            </label>
           )}
           {mode === 'login' && <p className="auth-foot">New here? <button onClick={() => setMode('create')}>Create an account</button></p>}
           {mode === 'create' && <p className="auth-foot">Already registered? <button onClick={() => setMode('login')}>Sign in</button></p>}

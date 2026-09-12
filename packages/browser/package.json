@@ -18,6 +18,7 @@
     "smoke:cancel": "tsx src/cancel-smoke.ts",
     "smoke:viewer": "tsx src/viewer-smoke.ts",
     "smoke:timeout": "tsx src/timeout-smoke.ts",
+    "smoke:event": "tsx src/event-smoke.ts",
     "test": "tsx --test test/*.test.ts"
   }
 }

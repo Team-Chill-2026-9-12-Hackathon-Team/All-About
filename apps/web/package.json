@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node --test --experimental-strip-types tests/history.test.mjs tests/query-routing.test.mjs"
+    "test": "node --test --experimental-strip-types tests/history.test.mjs tests/query-routing.test.mjs tests/vault-api.test.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",

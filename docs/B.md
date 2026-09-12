@@ -71,3 +71,13 @@
 - 2026-09-12 真实单来源集成烟测：经 Vite `/api` 代理创建 CSC207 LIVE_WEB run，HTTP 202；SSE 收到 viewer_ready、两次 browser_step、source_checked、viewer_closed、answer_ready 和终态，0 source_failed/run_error，cleanup=released。首次运行在旧 D 下诚实返回 partial、0 claims/evidence。
 - 随后合入 D 的 `69a8967 fix(evidence): extract requirements and prerequisites` 及其前置提交；B 的 LIVE_WEB planner 边界强制包含 `requirements`、`eligibility`。修正 D 最新分支的 NodeNext 相对导入与严格测试 fixture 后，全量检查通过。重启前后端后，同一 `smoke:live` 成功返回 completed、1 claim、1 evidence、0 unknown、cleanup=released，所有 assertion（含 answerReady）为 true。
 - 下一步：保留 CSC207 作为单来源保底，连续复跑并记录稳定性；随后再启用 U of T Events。Events 波动不得阻塞 Academic Calendar 保底。A 仍需把真实 SSE/AnswerBundle 接入界面。
+
+## 2026-09-12 活动字段冻结
+
+事实字段（requestedFields，不是 UI 区块）：
+- 课程：`requirements` / `prerequisite`、`eligibility`、`submission_format`、`deadline`、`location`
+- 活动：`event_date`、`event_time`、`location`、`organizer`、`registration_link`、`deadline`、`eligibility`、`requirements`、`event_description`、`event_name`
+- LIVE_WEB 课程查询仍强制 `requirements`+`eligibility`；活动查询强制 `event_date`+`location`，不再机械补课程字段
+- `scope.entity` 标识单场活动；本轮活动详情源 `alumni-carillon-recital`（Alumni 公开页）。Hart House/Xplore 因 Cloudflare 不作为本轮集成源
+- 命令：`npm run smoke:live`（课程回归）、`npm run smoke:live-event`（活动，走 POST /api/runs + SSE）
+- 缺字段允许诚实 partial；不得为 completed 虚构报名链接

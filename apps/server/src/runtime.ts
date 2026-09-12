@@ -1,4 +1,4 @@
-import { collectPages as collectWithSteel } from "@allabout/browser";
+import { collectPages as collectWithSteel, type CredentialResolver } from "@allabout/browser";
 import type {
   BuildAnswer,
   CollectPages,
@@ -6,10 +6,10 @@ import type {
 } from "@allabout/contracts";
 import { buildAnswer as buildWithEvidence } from "@allabout/evidence";
 
+import { collectFixturePages, shouldCollectFixtures } from "./fixture-collect.js";
 import { createOpenAiRunPlanner } from "./openai-planner.js";
 import { createDefaultPlan, RunExecutor, type RunPlanner } from "./run-executor.js";
 import { RunStore } from "./run-store.js";
-import type { VaultStore } from "./vault-store.js";
 
 export interface RuntimeOptions {
   sources: SourceConfig[];
@@ -19,14 +19,13 @@ export interface RuntimeOptions {
   planRun?: RunPlanner;
   collectPages?: CollectPages;
   buildAnswer?: BuildAnswer;
-  vaultStore?: VaultStore;
+  resolveCredential?: CredentialResolver;
 }
 
 export interface RunRuntime {
   sources: SourceConfig[];
   runStore: RunStore;
   runExecutor: RunExecutor;
-  vaultStore?: VaultStore;
 }
 
 export function createRunRuntime(options: RuntimeOptions): RunRuntime {
@@ -38,15 +37,12 @@ export function createRunRuntime(options: RuntimeOptions): RunRuntime {
   const collectPages =
     options.collectPages ??
     ((plan, emit, signal) =>
-      collectWithSteel(plan, emit, signal, {
-        credentials: options.vaultStore?.secretsForHosts(
-          plan.targets.flatMap((target) => target.allowedHosts),
-        ) ?? [],
-      }));
+      shouldCollectFixtures(plan)
+        ? collectFixturePages(plan, emit, signal)
+        : collectWithSteel(plan, emit, signal, options.resolveCredential));
   return {
     sources: options.sources,
     runStore,
-    ...(options.vaultStore ? { vaultStore: options.vaultStore } : {}),
     runExecutor: new RunExecutor({
       runStore,
       sources: options.sources,
@@ -59,9 +55,7 @@ export function createRunRuntime(options: RuntimeOptions): RunRuntime {
 
 function createConfiguredOpenAiPlanner(options: RuntimeOptions): RunPlanner {
   if (options.apiKey === undefined || options.model === undefined) {
-    throw new Error(
-      "OPENAI_API_KEY and OPENAI_MODEL are required when no planner override is provided.",
-    );
+    return (runId, input, sources) => createDefaultPlan(runId, input, sources);
   }
   const openai = createOpenAiRunPlanner({ apiKey: options.apiKey, model: options.model });
   return async (runId, input, sources, signal) => {

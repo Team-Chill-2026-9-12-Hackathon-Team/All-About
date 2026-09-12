@@ -1,17 +1,17 @@
 import type { SourceConfig } from "@allabout/contracts";
 import Fastify, { type FastifyServerOptions } from "fastify";
 
+import { registerCredentialRoutes } from "./credential-routes.js";
+import type { CredentialVault } from "./credential-vault.js";
 import { registerRunRoutes } from "./routes.js";
-import { registerVaultRoutes } from "./vault-routes.js";
 import type { RunExecutor } from "./run-executor.js";
 import { RunStore } from "./run-store.js";
-import { VaultStore } from "./vault-store.js";
 
 export interface AppDependencies {
   runStore?: RunStore;
   sources?: SourceConfig[];
   runExecutor?: Pick<RunExecutor, "start" | "cancel">;
-  vaultStore?: VaultStore;
+  credentialVault?: CredentialVault;
 }
 
 export function buildApp(
@@ -23,9 +23,7 @@ export function buildApp(
   const sources = dependencies.sources ?? [];
 
   app.get("/api/health", async () => ({ ok: true as const }));
-  if (dependencies.vaultStore) {
-    registerVaultRoutes(app, dependencies.vaultStore);
-  }
+  registerCredentialRoutes(app, dependencies.credentialVault);
   registerRunRoutes(app, {
     runStore,
     sources,

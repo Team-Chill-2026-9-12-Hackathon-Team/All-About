@@ -103,6 +103,7 @@ describe("HTTP boundary schemas", () => {
       answer: null,
       lastSeq: 1,
       cleanup: null,
+      viewerUrl: null,
     });
     ClarificationRequestSchema.parse({
       scopePatch: { term: "Fall 2026" },

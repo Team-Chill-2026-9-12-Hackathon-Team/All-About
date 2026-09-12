@@ -38,6 +38,7 @@ test('distinguishes access checks and login redirects', () => {
     false,
   );
   assert.equal(looksLikeAuthentication(200, 'https://weblogin.utoronto.ca/'), true);
+  assert.equal(looksLikeAuthentication(200, 'https://idpz.utorauth.utoronto.ca/idp/profile/SAML2/Redirect/SSO'), true);
   assert.equal(looksLikeAuthentication(200, 'https://harthouse.ca/events/example'), false);
 });
 

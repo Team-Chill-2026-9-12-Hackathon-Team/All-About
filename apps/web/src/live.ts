@@ -60,6 +60,24 @@ export interface PublicSource {
   contentMode: string;
 }
 
+export interface AnswerClaim {
+  id: string;
+  field: string;
+  text: string;
+  status: string;
+  evidenceIds: string[];
+}
+
+export interface AnswerConflict {
+  id: string;
+  claimIds: string[];
+  field: string;
+  resolution: string;
+  selectedClaimId: string | null;
+  explanation: string;
+  evidenceIds: string[];
+}
+
 export interface AnswerBundle {
   schemaVersion: string;
   runId: string;
@@ -68,9 +86,9 @@ export interface AnswerBundle {
   requirements: AnswerBlock[];
   communityNotes: AnswerBlock[];
   unknowns: string[];
-  claims: unknown[];
+  claims: AnswerClaim[];
   evidence: Evidence[];
-  conflicts: unknown[];
+  conflicts: AnswerConflict[];
   keyDates: KeyDate[];
   coverage: unknown[];
   sources: PublicSource[];
@@ -126,20 +144,22 @@ export const statusLabel = (s: RunStatus) => STATUS_LABEL[s];
 
 const COURSE_RE = /\b([a-z]{3})\s?-?\s?(\d{3})(h1|y1)?\b/i;
 
-export function buildQueryInput(question: string) {
+export function buildQueryInput(question: string, parentRunId?: string) {
   const plan = detectSearch(question);
+  const fixture = plan.sourceIds.some((id) => id.startsWith('demo101-'));
   return {
     query: question.trim().slice(0, 2000),
     scope: {
       school: 'University of Toronto',
       campus: 'UTSG',
-      term: null as string | null,
+      term: fixture ? 'Fall 2026' : null as string | null,
       course: plan.course,
       section: null as string | null,
       entity: plan.entity,
     },
-    mode: 'LIVE_WEB' as RunMode,
+    mode: (fixture ? 'LIVE_FIXTURE' : 'LIVE_WEB') as RunMode,
     sourceIds: plan.sourceIds,
+    ...(parentRunId ? { parentRunId } : {}),
   };
 }
 
@@ -176,6 +196,9 @@ export function preferPrimaryPage<T extends { title: string; url: string; source
 }
 
 export const SOURCE_META: Record<string, {label: string; url: string}> = {
+  'demo101-syllabus': {label: 'DEMO101 syllabus', url: 'https://fixture.example.edu/demo101/syllabus'},
+  'demo101-announcement': {label: 'DEMO101 announcement', url: 'https://fixture.example.edu/demo101/announcement'},
+  'demo101-student-discussion': {label: 'DEMO101 discussion', url: 'https://fixture.example.edu/demo101/discussion'},
   'academic-calendar-csc207': {label: 'CSC207 calendar', url: 'https://artsci.calendar.utoronto.ca/course/csc207h1'},
   'academic-calendar-csc148': {label: 'CSC148 calendar', url: 'https://artsci.calendar.utoronto.ca/course/csc148h1'},
   'cs-undergrad-courses': {label: 'CS department', url: 'https://web.cs.toronto.edu/undergraduate/courses'},
@@ -226,7 +249,7 @@ export interface LiveController {
   run: LiveRun | null;
   executionUnavailable: boolean;
   transportError: string | null;
-  start: (question: string) => Promise<void>;
+  start: (question: string, options?: { parentRunId?: string }) => Promise<void>;
   cancel: () => Promise<void>;
   clarify: (answer: string) => Promise<void>;
   restore: (item: { id: string; question: string; createdAt: number; mode?: string; status?: string }) => Promise<void>;
@@ -239,7 +262,6 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
   const [transportError, setTransportError] = useState<string | null>(null);
 
   const streamAbortRef = useRef<AbortController | null>(null);
-  const seenRef = useRef<Set<number>>(new Set());
   const activeIdRef = useRef<string | null>(null);
   const settledRef = useRef(onSettled);
   settledRef.current = onSettled;
@@ -253,11 +275,19 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
 
   const applyEvent = useCallback((env: EventEnvelope) => {
     setRun((prev) => {
-      if (!prev || prev.id !== env.runId) return prev;
-      if (seenRef.current.has(env.seq)) return prev;
-      seenRef.current.add(env.seq);
+      if (!prev) return prev;
+      const accepted =
+        prev.id === env.runId ||
+        prev.id === 'detecting' ||
+        (activeIdRef.current !== null && env.runId === activeIdRef.current);
+      if (!accepted) return prev;
+      if (env.seq <= prev.lastSeq) return prev;
 
-      const next: LiveRun = { ...prev, lastSeq: Math.max(prev.lastSeq, env.seq) };
+      const next: LiveRun = {
+        ...prev,
+        id: env.runId,
+        lastSeq: Math.max(prev.lastSeq, env.seq),
+      };
       const push = (a: Omit<Activity, 'seq'>) => {
         next.activities = [...next.activities, { seq: env.seq, ...a }];
       };
@@ -291,6 +321,7 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
             split_panes: 'Opened the split view',
             fallback_source: 'Opened a public fallback',
             sign_in: 'Signing in with the keychain',
+            credential_login: 'Signing in with the keychain',
             navigate: 'Opening the live page',
             read_visible_text: 'Reading visible text',
             hold_for_viewer: 'Holding the live browser so you can see it',
@@ -375,17 +406,31 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
           answer: AnswerBundle | null;
           cleanup: string | null;
           lastSeq: number;
+          viewerUrl?: string | null;
         };
         setRun((prev) => {
           if (!prev || prev.id !== id) return prev;
           const next: LiveRun = { ...prev };
           next.status = snap.status;
-          next.lastSeq = Math.max(next.lastSeq, snap.lastSeq ?? next.lastSeq);
-          if (snap.answer && !next.answer) next.answer = snap.answer;
-          if (snap.answer && next.activities.length === 0) {
-            next.activities = activitiesFromAnswer(snap.answer);
-            next.capturedPages = pagesFromAnswer(snap.answer);
-            next.lastPage = preferPrimaryPage(next.capturedPages, next.question) ?? next.capturedPages[0] ?? null;
+          if (snap.viewerUrl && !next.viewerClosed) {
+            next.viewerUrl = snap.viewerUrl;
+            next.viewerClosed = false;
+            next.viewerReason = null;
+          }
+          if (snap.answer) {
+            next.answer = snap.answer;
+            const pages = pagesFromAnswer(snap.answer);
+            if (pages.length > 0) {
+              const byId = new Map(next.capturedPages.map((page) => [page.sourceId, page]));
+              for (const page of pages) {
+                if (!byId.has(page.sourceId)) byId.set(page.sourceId, page);
+              }
+              next.capturedPages = [...byId.values()];
+              next.lastPage = preferPrimaryPage(next.capturedPages, next.question) ?? next.lastPage;
+            }
+            if (next.activities.length === 0) {
+              next.activities = activitiesFromAnswer(snap.answer);
+            }
           }
           if (snap.status === 'failed' && !next.error) {
             next.error = {
@@ -458,7 +503,7 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
   );
 
   const start = useCallback(
-    async (question: string) => {
+    async (question: string, options?: { parentRunId?: string }) => {
       if (!question.trim()) return;
       const previousId = activeIdRef.current;
       if (previousId) {
@@ -470,18 +515,18 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
         }
       }
       closeStream();
-      seenRef.current = new Set();
       setTransportError(null);
       setExecutionUnavailable(false);
 
       const createdAt = Date.now();
       const trimmed = question.trim().slice(0, 2000);
+      const queryInput = buildQueryInput(trimmed, options?.parentRunId);
       const seed = detectActivities(detectSearch(trimmed), SOURCE_LABEL);
       setRun({
         id: 'detecting',
         question: trimmed,
         createdAt,
-        mode: 'LIVE_WEB',
+        mode: queryInput.mode,
         status: 'planning',
         viewerUrl: null,
         viewerClosed: false,
@@ -499,7 +544,7 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
         const res = await fetch('/api/runs', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(buildQueryInput(question)),
+          body: JSON.stringify(queryInput),
         });
         if (res.status === 503) {
           setExecutionUnavailable(true);
@@ -520,7 +565,7 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
           id: body.runId,
           question: trimmed,
           createdAt,
-          mode: 'LIVE_WEB',
+          mode: queryInput.mode,
           status: 'queued',
           viewerUrl: null,
           viewerClosed: false,
@@ -575,7 +620,6 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
   const restore = useCallback(
     async (item: { id: string; question: string; createdAt: number; mode?: string; status?: string }) => {
       closeStream();
-      seenRef.current = new Set();
       setTransportError(null);
       setExecutionUnavailable(false);
       activeIdRef.current = item.id;
@@ -650,7 +694,6 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
   const reset = useCallback(() => {
     closeStream();
     activeIdRef.current = null;
-    seenRef.current = new Set();
     setRun(null);
     setTransportError(null);
     setExecutionUnavailable(false);
@@ -661,7 +704,7 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
   useEffect(() => {
     if (!run || isTerminal(run.status)) return;
     const id = run.id;
-    const timer = setInterval(() => void reconcile(id), 2500);
+    const timer = setInterval(() => void reconcile(id), 1000);
     return () => clearInterval(timer);
   }, [run?.id, run?.status, reconcile]);
 

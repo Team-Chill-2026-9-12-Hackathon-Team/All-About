@@ -271,12 +271,21 @@ export function createDefaultPlan(
     input,
     targets,
     requestedFields: defaultRequestedFields(input),
-    budget: { maxPages: 3, maxSteps: 8, timeoutMs: 90_000 },
+    budget: browserPlanBudget(targets),
   });
 }
 
+export function browserPlanBudget(targets: SourceConfig[]): QueryPlan["budget"] {
+  const needsLogin = targets.some((target) => target.access === "authorized");
+  return {
+    maxPages: 3,
+    maxSteps: needsLogin ? 12 : 8,
+    timeoutMs: 90_000,
+  };
+}
+
 function defaultRequestedFields(input: QueryInput): QueryPlan["requestedFields"] {
-  if (input.mode === "LIVE_FIXTURE") return ["deadline", "submission_format"];
+  if (input.mode === "LIVE_FIXTURE") return ["deadline", "submission_format", "late_penalty"];
   const ids = input.sourceIds ?? [];
   const query = input.query;
   if (
