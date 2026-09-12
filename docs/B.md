@@ -17,6 +17,8 @@
 - B2 契约切片：增加来源列表、创建任务、任务快照、澄清、取消和统一错误的 HTTP 边界 schema；来源公开摘要严格排除入口 URL 和其他配置。
 - B2 RunStore 切片：创建 run 时先持久 queued 事件；实现单活动 run、严格状态转换、澄清上下文合并、幂等取消、递增事件序号、历史补发和实时订阅。
 - B2 HTTP/SSE 切片：实现来源公开摘要、创建/恢复任务、提交澄清、取消任务和事件流；事件流支持终态迟连接补发、`Last-Event-ID` 断点续传及无效/超前游标错误。
+- B3 注入式执行器首片：按 planning → browsing → synthesizing → completed/partial/failed 驱动 RunStore，将浏览信号映射为公共事件；每个任务使用独立 AbortController，取消后的迟到结果不会写回。
+- 增加两个仅供自动化测试使用的可控 mock adapter；其内容明确标注为 synthetic fixture，不通过默认产品接口冒充实时 UTSG 数据。真实 C/D 依赖尚未接入。
 
 ## 验证与同步
 
@@ -33,6 +35,7 @@
 - B2 HTTP schema 的 contracts 类型检查通过；contracts 当前 7 个测试通过。完整根级检查在 API/RunStore 切片完成后重跑。
 - RunStore 类型检查及 7 个针对性测试通过，覆盖活动冲突、状态机、迟连接、实时后续事件、超前游标、澄清和重复取消。
 - HTTP/SSE 路由类型检查及 8 个针对性测试通过，覆盖来源脱敏、输入校验、单活动任务冲突、恢复、澄清、幂等取消、终态补发、断点续传和游标拒绝。
+- 注入式执行器 5 个针对性测试通过，覆盖 HTTP 创建后的自动执行、完整事件顺序、partial、取消/abort/迟到结果隔离，以及 adapter 失败。
 
 ## 当前边界
 
@@ -41,4 +44,4 @@
 - 真实密钥已安全复制到此 checkout 的 `.env`，该文件被 Git 忽略；未输出或暂存密钥。
 - 当前 Codex 运行环境能运行 Node，但没有全局 `npm` 命令；通过临时 npm 12.0.2 完成依赖安装。团队普通 Node/npm 环境可直接使用锁文件；本地后续检查可直接调用已安装工具。
 - 正常团队命令：`npm install`、`npm run dev:server`、`npm run typecheck`、`npm test`。当前 Codex 终端的验证使用锁文件中相同工具直接执行，并额外完成真实服务烟测。
-- 下一步：增加两个可控 mock adapter 和任务执行器，让创建后的 run 自动走完 planning → browsing → synthesizing → completed/partial 流程；随后再接入 C/D 的真实实现。具体演示课程/活动尚未选定，推进到依赖该选择的步骤时及时问用户。
+- 下一步：补齐执行总超时、澄清等待和更细的清理生命周期；随后再接入 C/D 的真实实现。具体演示课程/活动尚未选定，推进到依赖该选择的步骤时及时问用户。

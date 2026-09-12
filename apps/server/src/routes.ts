@@ -8,6 +8,7 @@ import {
   SourcesResponseSchema,
   type EventEnvelope,
   type Scope,
+  type RunSnapshot,
   type SourceConfig,
 } from "@allabout/contracts";
 import type { FastifyInstance, FastifyReply } from "fastify";
@@ -24,6 +25,8 @@ import {
 interface RunRoutesDependencies {
   runStore: RunStore;
   sources: SourceConfig[];
+  onRunCreated?: (runId: string) => void;
+  cancelRun?: (runId: string) => RunSnapshot;
 }
 
 function sendError(
@@ -92,8 +95,9 @@ function removeUndefinedScopeValues(
 
 export function registerRunRoutes(
   app: FastifyInstance,
-  { runStore, sources }: RunRoutesDependencies,
+  dependencies: RunRoutesDependencies,
 ): void {
+  const { runStore, sources } = dependencies;
   app.get("/api/sources", async () =>
     SourcesResponseSchema.parse(
       sources.map(({ id, label, kind, access }) => ({ id, label, kind, access })),
@@ -113,6 +117,9 @@ export function registerRunRoutes(
 
     try {
       const run = runStore.create(parsedInput.data);
+      if (dependencies.onRunCreated !== undefined) {
+        queueMicrotask(() => dependencies.onRunCreated?.(run.runId));
+      }
       return reply.code(202).send(
         CreateRunResponseSchema.parse({
           runId: run.runId,
@@ -198,7 +205,7 @@ export function registerRunRoutes(
         return sendError(reply, 400, "INVALID_RUN_ID", "A run ID is required.");
       }
       try {
-        const run = runStore.cancel(runId);
+        const run = dependencies.cancelRun?.(runId) ?? runStore.cancel(runId);
         return reply.code(202).send(
           CancelRunResponseSchema.parse({ runId: run.runId, status: run.status }),
         );
