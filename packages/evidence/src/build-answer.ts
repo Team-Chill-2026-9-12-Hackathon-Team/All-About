@@ -1,27 +1,29 @@
-import { RuleBasedExtractor } from "./extract/rule-based-extractor.ts";
-import type { CandidateExtractor } from "./extract/types.ts";
-import { resolveConflicts } from "./conflicts/resolve-conflicts.ts";
-import { quoteExists } from "./text.ts";
-import type { AnswerBlock, AnswerBundle, BrowserBatch, Claim, Evidence, QueryPlan } from "./types.ts";
+import { resolveConflicts } from "./conflicts/resolve-conflicts.js";
+import { parseDateValue } from "./dates.js";
+import { RuleBasedExtractor } from "./extract/rule-based-extractor.js";
+import type { CandidateExtractor } from "./extract/types.js";
+import { normalizeText, quoteExists } from "./text.js";
+import type { AnswerBlock, AnswerBundle, BrowserBatch, Claim, Evidence, QueryPlan } from "@allabout/contracts";
 
-const MONTHS: Record<string, string> = {
-  january: "01", february: "02", march: "03", april: "04",
-  may: "05", june: "06", july: "07", august: "08",
-  september: "09", october: "10", november: "11", december: "12",
+const SUMMARY_FIELDS = new Set([
+  "deadline", "eligibility", "event_date", "event_description", "event_name",
+  "event_time", "location", "organizer", "registration_link",
+]);
+const REQUIREMENT_FIELDS = new Set(["requirements", "submission_format"]);
+const FIELD_ALIASES: Record<string, string> = {
+  campus: "location",
+  date: "event_date",
+  prerequisite: "requirements",
+  time: "event_time",
 };
 
-function parseDate(raw: string): Claim["dateValue"] {
-  const instant = raw.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})$/);
-  if (instant) return { precision: "instant", iso: new Date(raw).toISOString(), timezone: raw.slice(-6) };
-  const match = raw.match(/([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})/);
-  if (!match) return { precision: "unknown", raw };
-  const month = MONTHS[match[1].toLowerCase()];
-  if (!month) return { precision: "unknown", raw };
-  return {
-    precision: "date",
-    date: `${match[3]}-${month}-${match[2].padStart(2, "0")}`,
-    timezone: null,
-  };
+function canonicalField(field: string): string {
+  return FIELD_ALIASES[field] ?? field;
+}
+
+function scopeIdentity(claimScope: Claim["scope"], snapshotId: string): string {
+  const stable = JSON.stringify(claimScope);
+  return claimScope.entity ? stable : `${stable}:${snapshotId}`;
 }
 
 export function createEvidenceEngine(extractor: CandidateExtractor) {
@@ -40,7 +42,7 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
     const claimByKey = new Map<string, Claim>();
     for (const candidate of candidates) {
       const snapshot = snapshots.get(candidate.snapshotId);
-      if (!snapshot || !quoteExists(candidate.quote, snapshot.text)) continue;
+      if (!snapshot || !candidate.quote.trim() || !quoteExists(candidate.quote, snapshot.text)) continue;
 
       const evidenceItem: Evidence = {
         id: `evidence-${evidence.length + 1}`,
@@ -50,13 +52,19 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
         authorityBasis: candidate.authorityBasis,
       };
       evidence.push(evidenceItem);
-      const dateValue = candidate.dateRaw ? parseDate(candidate.dateRaw) : undefined;
-      const key = JSON.stringify([candidate.field, candidate.text.trim().replace(/\s+/g, " "), snapshot.scope, dateValue]);
+      const dateValue = candidate.dateRaw ? parseDateValue(candidate.dateRaw) : undefined;
+      const value = normalizeText(candidate.dedupeValue ?? candidate.text).toLowerCase();
+      const key = JSON.stringify([
+        candidate.field,
+        scopeIdentity(snapshot.scope, snapshot.id),
+        dateValue ?? value,
+      ]);
       const existing = claimByKey.get(key);
       if (existing) {
         existing.evidenceIds.push(evidenceItem.id);
         continue;
       }
+
       const claim: Claim = {
         id: `claim-${claims.length + 1}`,
         field: candidate.field,
@@ -71,14 +79,19 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
       claims.push(claim);
     }
 
-    const failures = new Map(batch.failures.map((item) => [item.sourceId, item]));
+    const failuresBySource = new Map<string, string[]>();
+    for (const failure of batch.failures) {
+      failuresBySource.set(failure.sourceId, [...(failuresBySource.get(failure.sourceId) ?? []), failure.message]);
+    }
     const coverage = plan.targets.map((target) => {
       const pages = batch.pages.filter((page) => page.sourceId === target.id);
-      const failure = failures.get(target.id);
+      const failureMessages = failuresBySource.get(target.id) ?? [];
       return {
         sourceId: target.id,
-        status: pages.length > 0 ? "checked" as const : failure ? "blocked" as const : "not_checked" as const,
-        reason: failure?.message ?? null,
+        status: pages.length && failureMessages.length ? "partial" as const
+          : pages.length ? "checked" as const
+            : failureMessages.length ? "blocked" as const : "not_checked" as const,
+        reason: failureMessages.length ? failureMessages.join("; ") : null,
         snapshotIds: pages.map((page) => page.id),
       };
     });
@@ -86,30 +99,50 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
     const resolved = resolveConflicts(claims, evidence, batch.pages);
     const block = (claim: Claim): AnswerBlock => ({ text: claim.text, claimIds: [claim.id], evidenceIds: claim.evidenceIds });
     const supported = resolved.claims.filter((claim) => claim.status === "supported");
-    const summary = supported.filter((claim) => ["deadline", "location", "eligibility", "event_date", "organizer", "event_description"].includes(claim.field)).map(block);
-    const requirements = supported.filter((claim) => ["submission_format", "requirements"].includes(claim.field)).map(block);
+    const summary = supported.filter((claim) => SUMMARY_FIELDS.has(claim.field)).map(block);
+    const requirements = supported.filter((claim) => REQUIREMENT_FIELDS.has(claim.field)).map(block);
     const communityNotes = supported.filter((claim) => claim.nature === "opinion" || claim.field === "community_note").map(block);
+
+    const unknowns: string[] = [];
+    const presentFields = new Set(resolved.claims.filter((claim) => claim.status !== "superseded").map((claim) => claim.field));
+    for (const requestedField of new Set(plan.requestedFields.map(canonicalField))) {
+      if (!presentFields.has(requestedField)) {
+        const entity = plan.input.scope.entity ? ` for ${plan.input.scope.entity}` : "";
+        unknowns.push(`The checked sources did not provide ${requestedField}${entity}.`);
+      }
+    }
+    for (const conflict of resolved.conflicts.filter((item) => item.resolution === "unresolved")) {
+      unknowns.push(`Conflicting ${conflict.field} values require confirmation from an authoritative source.`);
+    }
+    for (const claim of resolved.claims) {
+      if (claim.dateValue?.precision === "unknown") {
+        unknowns.push(`The date or time in claim ${claim.id} could not be normalized without inventing missing context: ${claim.dateValue.raw}`);
+      }
+    }
+    for (const item of coverage.filter((entry) => entry.status !== "checked")) {
+      unknowns.push(`Source ${item.sourceId} was ${item.status}${item.reason ? `: ${item.reason}` : "."}`);
+    }
+
+    const seenSources = new Set<string>();
+    const sources = batch.pages
+      .filter((page) => !seenSources.has(page.id) && seenSources.add(page.id))
+      .map(({ text: _text, ...source }) => source);
+
     return {
       schemaVersion: "1",
       runId: plan.runId,
-      mode: plan.input?.mode ?? "LIVE_FIXTURE",
-      scope: plan.input?.scope ?? supported[0]?.scope ?? batch.pages[0]?.scope ?? {
-        school: null, campus: null, term: null, course: null, section: null, entity: null,
-      },
+      mode: plan.input.mode,
+      scope: plan.input.scope,
       summary,
       requirements,
       communityNotes,
-      unknowns: resolved.claims.length === 0
-        ? ["No supported facts were found in the checked pages."]
-        : resolved.conflicts.some((item) => item.resolution === "unresolved")
-          ? ["Conflicting values require confirmation from an authoritative source."]
-          : [],
+      unknowns: [...new Set(unknowns)],
       claims: resolved.claims,
       evidence,
       conflicts: resolved.conflicts,
       keyDates: resolved.keyDates,
       coverage,
-      sources: batch.pages.map(({ text: _text, ...source }) => source),
+      sources,
       generatedAt: new Date().toISOString(),
     };
   };

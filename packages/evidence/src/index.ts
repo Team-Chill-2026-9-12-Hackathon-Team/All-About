@@ -1,6 +1,7 @@
-export { buildAnswer, createEvidenceEngine } from "./build-answer.ts";
-export { RuleBasedExtractor } from "./extract/rule-based-extractor.ts";
-export { resolveConflicts } from "./conflicts/resolve-conflicts.ts";
-export type { CandidateExtractor, ExtractedCandidate } from "./extract/types.ts";
-export { normalizeText, quoteExists } from "./text.ts";
-export type * from "./types.ts";
+export { buildAnswer, createEvidenceEngine } from "./build-answer.js";
+export { parseDateValue } from "./dates.js";
+export { RuleBasedExtractor } from "./extract/rule-based-extractor.js";
+export { resolveConflicts } from "./conflicts/resolve-conflicts.js";
+export type { CandidateExtractor, ExtractedCandidate } from "./extract/types.js";
+export { normalizeText, quoteExists } from "./text.js";
+export type { AnswerBundle, BrowserBatch, Claim, Evidence, PageSnapshot, QueryPlan, Scope } from "@allabout/contracts";

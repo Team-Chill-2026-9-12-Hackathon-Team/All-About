@@ -3,8 +3,17 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
   "scripts": {
-    "smoke": "node src/smoke.ts",
-    "test": "node --test test/*.test.ts"
+    "samples": "tsx src/generate-samples.ts",
+    "smoke": "tsx src/smoke.ts",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@allabout/contracts": "*"
   }
 }
