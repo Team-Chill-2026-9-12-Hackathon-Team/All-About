@@ -6,6 +6,20 @@ AllAbout Campus helps students ask practical course questions—such as assignme
 
 Built for the Battle of Schools Hackathon.
 
+## Interface preview
+
+### Sign in
+
+![AllAbout Campus sign-in screen](docs/screenshots/login.png)
+
+### Choose your campus tools
+
+![AllAbout Campus tool setup screen](docs/screenshots/tool-setup.png)
+
+### Course Desk and Steel Live Browser
+
+![AllAbout Campus Course Desk screen](docs/screenshots/course-desk.png)
+
 ## What it does
 
 - **Course Desk** — ask course questions in a chat workspace and receive a concise answer with citations.
