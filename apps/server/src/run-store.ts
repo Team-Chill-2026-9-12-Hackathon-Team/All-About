@@ -25,6 +25,10 @@ const terminalStatuses = new Set<RunStatus>([
   "cancelled",
 ]);
 
+export function isTerminalRunStatus(status: RunStatus): boolean {
+  return terminalStatuses.has(status);
+}
+
 const allowedTransitions: Record<RunStatus, ReadonlySet<RunStatus>> = {
   queued: new Set(["planning", "cancelling"]),
   planning: new Set(["needs_input", "browsing", "failed", "cancelling"]),
@@ -103,7 +107,7 @@ export class RunStore {
 
   create(input: QueryInput): RunSnapshot {
     const activeRun = [...this.#runs.values()].find(
-      (run) => !terminalStatuses.has(run.status),
+      (run) => !isTerminalRunStatus(run.status),
     );
     if (activeRun) {
       throw new ActiveRunConflictError(activeRun.runId);
@@ -184,7 +188,7 @@ export class RunStore {
 
   cancel(runId: string): RunSnapshot {
     const record = this.#require(runId);
-    if (terminalStatuses.has(record.status)) {
+    if (isTerminalRunStatus(record.status)) {
       return this.getSnapshot(runId);
     }
     if (record.status !== "cancelling") {
@@ -212,7 +216,7 @@ export class RunStore {
       throw new InvalidEventCursorError(runId, afterSeq, lastSeq);
     }
 
-    const terminal = terminalStatuses.has(record.status);
+    const terminal = isTerminalRunStatus(record.status);
     const listeners = this.#listeners.get(runId) ?? new Set<EventListener>();
     if (!terminal) {
       listeners.add(listener);
