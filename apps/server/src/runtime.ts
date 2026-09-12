@@ -1,4 +1,4 @@
-import { collectPages as collectWithSteel } from "@allabout/browser";
+import { collectPages as collectWithSteel, type CredentialResolver } from "@allabout/browser";
 import type {
   BuildAnswer,
   CollectPages,
@@ -18,6 +18,7 @@ export interface RuntimeOptions {
   planRun?: RunPlanner;
   collectPages?: CollectPages;
   buildAnswer?: BuildAnswer;
+  resolveCredential?: CredentialResolver;
 }
 
 export interface RunRuntime {
@@ -39,7 +40,8 @@ export function createRunRuntime(options: RuntimeOptions): RunRuntime {
       runStore,
       sources: options.sources,
       planRun,
-      collectPages: options.collectPages ?? collectWithSteel,
+      collectPages: options.collectPages ?? ((plan, emit, signal) =>
+        collectWithSteel(plan, emit, signal, options.resolveCredential)),
       buildAnswer: options.buildAnswer ?? buildWithEvidence,
     }),
   };
