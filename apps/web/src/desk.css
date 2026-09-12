@@ -515,3 +515,7 @@ to{opacity:1;transform:translateY(0)}
 .icon-button{width:36px;border:1px solid transparent}
 .demo-badge{padding:0 11px;border-radius:18px}
 @media(max-width:720px){.header-actions{gap:5px}.history-trigger{width:34px;min-width:34px;padding:0}.icon-button{width:34px}.demo-badge{height:34px;padding:0 9px}}
+
+
+/* Keep the primary desk side by side. */
+@media(max-width:720px){.workspace{display:grid;grid-template-columns:minmax(280px,.9fr) minmax(320px,1.25fr);height:calc(100vh - 149px);min-height:570px;max-height:1000px}.chat-panel{border-right:1px solid var(--line);border-bottom:0}.chat-body{max-height:none;min-height:0}.browser-panel{min-height:0}}
