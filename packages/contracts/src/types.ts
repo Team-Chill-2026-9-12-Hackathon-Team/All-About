@@ -3,13 +3,16 @@ import type { z } from "zod";
 import type {
   AnswerBlockSchema,
   AnswerBundleSchema,
+  ApiErrorSchema,
   AuthoritySchema,
   BrowserBatchSchema,
   BrowserSignalSchema,
   ClaimSchema,
+  ClarificationRequestSchema,
   ConflictSchema,
   ContentModeSchema,
   CoverageSchema,
+  CreateRunResponseSchema,
   DateValueSchema,
   EventEnvelopeSchema,
   EvidenceSchema,
@@ -17,20 +20,18 @@ import type {
   KeyDateSchema,
   PageSnapshotSchema,
   PublicSourceSchema,
-  ClarificationRequestSchema,
-  ClarificationResponseSchema,
-  CreateRunResponseSchema,
   QueryInputSchema,
   QueryPlanSchema,
   RunSnapshotSchema,
   RunModeSchema,
   RunStatusSchema,
   ScopeSchema,
+  SourceSummarySchema,
+  SourcesResponseSchema,
+  CancelRunResponseSchema,
   SourceConfigSchema,
   SourceFailureSchema,
   SourceKindSchema,
-  SourceSummarySchema,
-  SseEventIdSchema,
 } from "./schemas.js";
 
 export type Scope = z.infer<typeof ScopeSchema>;
@@ -50,13 +51,14 @@ export type Coverage = z.infer<typeof CoverageSchema>;
 export type AnswerBlock = z.infer<typeof AnswerBlockSchema>;
 export type PublicSource = z.infer<typeof PublicSourceSchema>;
 export type AnswerBundle = z.infer<typeof AnswerBundleSchema>;
-export type EventEnvelope = z.infer<typeof EventEnvelopeSchema>;
+export type ApiError = z.infer<typeof ApiErrorSchema>;
 export type SourceSummary = z.infer<typeof SourceSummarySchema>;
-export type RunSnapshot = z.infer<typeof RunSnapshotSchema>;
+export type SourcesResponse = z.infer<typeof SourcesResponseSchema>;
 export type CreateRunResponse = z.infer<typeof CreateRunResponseSchema>;
+export type RunSnapshot = z.infer<typeof RunSnapshotSchema>;
 export type ClarificationRequest = z.infer<typeof ClarificationRequestSchema>;
-export type ClarificationResponse = z.infer<typeof ClarificationResponseSchema>;
-export type SseEventId = z.infer<typeof SseEventIdSchema>;
+export type CancelRunResponse = z.infer<typeof CancelRunResponseSchema>;
+export type EventEnvelope = z.infer<typeof EventEnvelopeSchema>;
 export type SourceKind = z.infer<typeof SourceKindSchema>;
 export type RunMode = z.infer<typeof RunModeSchema>;
 export type ContentMode = z.infer<typeof ContentModeSchema>;

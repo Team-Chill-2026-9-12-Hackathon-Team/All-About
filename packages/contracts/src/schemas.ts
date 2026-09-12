@@ -227,41 +227,44 @@ export const RunStatusSchema = z.enum([
   "cancelled",
 ]);
 
-export const SourceSummarySchema = z.strictObject({
-  id: identifierSchema,
-  label: z.string().trim().min(1),
-  kind: SourceKindSchema,
-  access: z.enum(["public", "authorized", "unconfigured"]),
+export const SourceSummarySchema = SourceConfigSchema.pick({
+  id: true,
+  label: true,
+  kind: true,
+  access: true,
+});
+
+export const SourcesResponseSchema = z.array(SourceSummarySchema);
+
+export const CreateRunResponseSchema = z.strictObject({
+  runId: identifierSchema,
+  eventsUrl: z.string().startsWith("/api/runs/"),
+  status: z.literal("queued"),
 });
 
 export const RunSnapshotSchema = z.strictObject({
   runId: identifierSchema,
-  input: QueryInputSchema,
   status: RunStatusSchema,
-  bundle: AnswerBundleSchema.nullable(),
-  lastEventSeq: z.number().int().nonnegative(),
-  cleanup: BrowserBatchSchema.shape.cleanup.nullable(),
-});
-
-export const CreateRunResponseSchema = z.strictObject({
-  runId: identifierSchema,
-  eventsUrl: z.string().startsWith("/api/runs/").endsWith("/events"),
-  queued: z.literal(true),
+  answer: AnswerBundleSchema.nullable(),
+  lastSeq: z.number().int().nonnegative(),
 });
 
 export const ClarificationRequestSchema = z.strictObject({
-  scope: ScopeSchema,
+  scopePatch: ScopeSchema.partial(),
   answer: z.string().trim().min(1),
 });
 
-export const ClarificationResponseSchema = z.strictObject({
-  run: RunSnapshotSchema,
+export const CancelRunResponseSchema = z.strictObject({
+  runId: identifierSchema,
+  status: RunStatusSchema,
 });
 
-export const SseEventIdSchema = z.string().regex(
-  /^[^\s:]+:[1-9]\d*$/,
-  "Expected an event ID in the form runId:seq.",
-);
+export const ApiErrorSchema = z.strictObject({
+  error: z.strictObject({
+    code: z.string().trim().min(1),
+    message: z.string().trim().min(1),
+  }),
+});
 
 const eventBaseShape = {
   schemaVersion: SchemaVersionSchema,

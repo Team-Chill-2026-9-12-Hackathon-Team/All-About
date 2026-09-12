@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   AnswerBundleSchema,
+  ApiErrorSchema,
   BrowserBatchSchema,
+  CancelRunResponseSchema,
   ClarificationRequestSchema,
   CreateRunResponseSchema,
   EventEnvelopeSchema,
@@ -12,8 +14,7 @@ import {
   QueryInputSchema,
   QueryPlanSchema,
   RunSnapshotSchema,
-  SourceSummarySchema,
-  SseEventIdSchema,
+  SourcesResponseSchema,
 } from "../src/index.js";
 
 async function readExample(name: string): Promise<unknown> {
@@ -89,58 +90,40 @@ describe("boundary rejection", () => {
   });
 });
 
-describe("run API contracts", () => {
-  const input = {
-    query: "When is course registration?",
-    scope: {
-      school: "University of Toronto",
-      campus: "UTSG",
-      term: null,
-      course: null,
-      section: null,
-      entity: null,
-    },
-    mode: "LIVE_WEB",
-  };
-
-  it("validates public run, source, and clarification shapes", () => {
-    SourceSummarySchema.parse({
-      id: "academic-calendar",
-      label: "Academic Calendar",
-      kind: "official",
-      access: "public",
-    });
+describe("HTTP boundary schemas", () => {
+  it("validates the documented API response shapes", () => {
     CreateRunResponseSchema.parse({
       runId: "run-1",
       eventsUrl: "/api/runs/run-1/events",
-      queued: true,
+      status: "queued",
     });
     RunSnapshotSchema.parse({
       runId: "run-1",
-      input,
       status: "queued",
-      bundle: null,
-      lastEventSeq: 1,
-      cleanup: null,
+      answer: null,
+      lastSeq: 1,
     });
     ClarificationRequestSchema.parse({
-      scope: input.scope,
+      scopePatch: { term: "Fall 2026" },
       answer: "Fall 2026",
     });
-    SseEventIdSchema.parse("run-1:2");
+    CancelRunResponseSchema.parse({ runId: "run-1", status: "cancelled" });
+    ApiErrorSchema.parse({
+      error: { code: "RUN_NOT_FOUND", message: "Run not found." },
+    });
   });
 
-  it("rejects malformed run API payloads", () => {
+  it("prevents the source list from leaking entry URLs or configuration", () => {
     expect(() =>
-      CreateRunResponseSchema.parse({
-        runId: "run-1",
-        eventsUrl: "/events",
-        queued: true,
-      }),
-    ).toThrow();
-    expect(() => SseEventIdSchema.parse("run-1:0")).toThrow();
-    expect(() =>
-      ClarificationRequestSchema.parse({ scope: input.scope, answer: " " }),
+      SourcesResponseSchema.parse([
+        {
+          id: "source-1",
+          label: "Example source",
+          kind: "official",
+          access: "public",
+          entryUrl: "https://example.edu/private-entry",
+        },
+      ]),
     ).toThrow();
   });
 });
