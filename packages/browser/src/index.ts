@@ -10,8 +10,6 @@ import {
   readLinks,
   readVisibleText,
 } from './page-tools.js';
-
-export { attemptCredentialLogin, loginHostsFor, type CredentialResolver } from './login.js';
 import type {
   BrowserBatch,
   BrowserSignal,
@@ -23,6 +21,7 @@ import type {
 
 export type * from '@allabout/contracts';
 export { assertAllowedUrl, readLinks, readVisibleText } from './page-tools.js';
+export { attemptCredentialLogin, loginHostsFor, type CredentialResolver } from './login.js';
 
 const MIN_TEXT_LENGTH = 100;
 const MAX_SESSION_MS = 5 * 60_000;

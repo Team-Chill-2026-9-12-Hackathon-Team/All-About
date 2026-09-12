@@ -2,8 +2,8 @@ import React, {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {
   AlarmClock, ArrowRight, ArrowUp, ArrowUpRight, BellRing, BookOpen, CalendarDays, Check, ChevronDown,
-  Eye, EyeOff, Globe, GraduationCap, History, LayoutGrid, LoaderCircle, Mail, MessageSquare, Monitor, Smartphone,
-  KeyRound, Plus, RotateCcw, Search, SlidersHorizontal, Square, Trash2, Upload, X,
+  Eye, EyeOff, Globe, GraduationCap, History, KeyRound, LayoutGrid, LoaderCircle, Mail, MessageSquare, Monitor, Smartphone,
+  Plus, RotateCcw, Search, SlidersHorizontal, Square, Trash2, Upload, X,
 } from 'lucide-react';
 import {HISTORY_KEY, SETTINGS_KEY, readHistory, readPreferences, type HistoryItem, type Preferences} from './history';
 import {
@@ -313,6 +313,7 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
   const [history, setHistory] = useState(readHistory);
   const [prefs, setPrefs] = useState(readPreferences);
   const [drawer, setDrawer] = useState(false);
+  const [vaultOpen, setVaultOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [settings, setSettings] = useState(false);
   const [about, setAbout] = useState(false);
@@ -446,6 +447,7 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
     setActivityOpen(true);
     setLiveScroll(true);
     setDrawer(false);
+    setVaultOpen(false);
     setClarifyText('');
     chat.current?.scrollTo({top: 0});
     await live.start(question, options);
@@ -509,6 +511,14 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
         </button>
         <div className="header-actions">
           <button className="tools-back" onClick={onBack}><LayoutGrid size={16} />My tools</button>
+          <button
+            className={`vault-trigger ${vaultOpen ? 'is-active' : ''}`}
+            aria-label="Open password vault"
+            aria-expanded={vaultOpen}
+            onClick={() => { setVaultOpen(true); setDrawer(false); setSettings(false); }}
+          >
+            <KeyRound size={17} />
+          </button>
           <span className="term">U of T · Fall 2026</span>
           <span className="mode-chip" aria-label="Run mode">{run?.mode ?? 'LIVE_WEB'}</span>
           <button
@@ -527,7 +537,7 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
             className={`history-trigger ${drawer ? 'is-active' : ''}`}
             ref={historyButton}
             aria-expanded={drawer}
-            onClick={() => { setDrawer(true); setSearch(''); setSettings(false); }}
+            onClick={() => { setDrawer(true); setVaultOpen(false); setSearch(''); setSettings(false); }}
           >
             <History size={16} />History{history.length > 0 && <span className="count">{history.length}</span>}
           </button>
@@ -824,6 +834,7 @@ function Workspace({features = [], onBack, onLogout}: {features: string[]; onBac
         <span>ALLABOUT CAMPUS</span>
         <span>Made for the questions between classes.</span>
       </footer>
+      <VaultDrawer open={vaultOpen} onClose={() => setVaultOpen(false)} />
       {drawer && (
         <div className="drawer-backdrop" onClick={() => setDrawer(false)}>
           <aside ref={dialog} className="history-drawer" role="dialog" aria-modal="true" aria-labelledby="history-heading" onClick={(e) => e.stopPropagation()}>
