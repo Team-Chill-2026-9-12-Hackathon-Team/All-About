@@ -523,3 +523,14 @@ to{opacity:1;transform:translateY(0)}
 
 /* Keep sign-in split into its brand and form columns. */
 @media(max-width:800px){.auth-shell{display:grid;grid-template-columns:minmax(300px,43%) minmax(330px,1fr)}.auth-aside{min-height:100vh;padding:42px clamp(26px,5vw,70px)}.auth-copy{margin:70px 0}.auth-copy h1{font-size:clamp(32px,4vw,50px)}.auth-grid{display:grid}.auth-main{min-height:100vh;padding:40px clamp(26px,6vw,90px)}.auth-card{margin:auto}.auth-top{position:static;color:#5c7388}.auth-top>span{display:block}}
+
+
+/* Performance and motion refinement */
+:root{--motion-fast:180ms;--motion-content:360ms;--motion-page:560ms}
+.background-wordmark,.panel-watermark{display:none}
+.workspace{background:#fbfcfd;box-shadow:0 9px 24px #002e5410;backdrop-filter:none}
+.activity-collapse,.quote-collapse{display:none}.activity-collapse.open,.quote-collapse.open{display:block;animation:reveal var(--motion-content) var(--ease) both}
+.activity-item,.answer{animation-duration:var(--motion-content)}.evidence{animation-duration:var(--motion-content);animation-delay:120ms}
+mark{animation:none}
+.motion-slide .page-preview.direction-next,.motion-slide .page-preview.direction-prev,.motion-page .page-preview.direction-next,.motion-page .page-preview.direction-prev{animation-duration:var(--motion-page)}
+@keyframes reveal{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
