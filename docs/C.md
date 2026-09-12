@@ -23,6 +23,8 @@ npm test
 python3 packages/browser/run-with-key.py /absolute/path/to/SteelKey.rtf
 # 运行公共 collectPages 两页验收
 python3 packages/browser/run-with-key.py /absolute/path/to/SteelKey.rtf smoke:collect
+# 现场保底：Academic Calendar 两页
+python3 packages/browser/run-with-key.py /absolute/path/to/SteelKey.rtf smoke:calendar
 # 真实创建后在导航阶段取消，并验证远端释放
 python3 packages/browser/run-with-key.py /absolute/path/to/SteelKey.rtf smoke:cancel
 # 本机 Chrome 打开只读 viewer 并保存截图验收
@@ -101,3 +103,4 @@ npm run smoke --prefix packages/browser
 - 共享契约接入后发现 `tsx` 转译的嵌套 page.evaluate 回调在远端缺少 `__name` helper；已改为 locator API，并同时消除不存在 metadata selector 的30秒隐式等待。
 - 修复后公开查询连续三轮通过：每轮2页、0最终失败、共享 BrowserBatchSchema 通过、cleanup=released；其中两轮触发一次 Hart House 重试后恢复。真实1秒总预算测试正确返回 TIMEOUT 并释放会话。
 - B/C 真实 HTTP 联调通过：`POST /api/browser/collect` 抓取 CSC207H1 Academic Calendar，返回1页、0失败、583字符，并产生 session_ready/step/page_read 信号，cleanup=released。同轮 UofT Events 出现可重试 TIMEOUT，说明现场演示应保留课程官网作为稳定来源。
+- 实机小测（2026-09-12 17:39 UTC）：`smoke:calendar` 读取 CSC207（583字符）+ CSC148（1046字符），约7.5秒，2页、0失败、viewer 事件存在、cleanup=released。随后 `smoke:viewer` 打开 Academic Calendar CSC207，Session Player HTTP200、2个媒体表面、截图约204KB，cleanup=released。活动页 `smoke:collect` 仍仅作加分路径。
