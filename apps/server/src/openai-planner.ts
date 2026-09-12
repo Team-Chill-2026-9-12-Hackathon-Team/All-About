@@ -14,10 +14,13 @@ const scopeFieldSchema = z.enum([
   "entity",
 ]);
 const requestedFieldSchema = z.enum([
-  "summary",
-  "requirements",
-  "communityNotes",
-  "keyDates",
+  "deadline",
+  "submission_format",
+  "eligibility",
+  "location",
+  "registration_process",
+  "contact",
+  "other",
 ]);
 
 export const PlannerDecisionSchema = z.strictObject({
@@ -129,7 +132,7 @@ export function createOpenAiRunPlanner({
         model,
         store: false,
         instructions:
-          "Route the campus question only to IDs in the supplied source catalog. Do not invent URLs or facts. Ask one concise clarification only when scope ambiguity prevents safe source selection.",
+          "Route the campus question only to IDs in the supplied source catalog and select factual requested fields, not UI section names. Do not invent URLs or facts. Ask one concise clarification only when scope ambiguity prevents safe source selection.",
         input: JSON.stringify({ queryInput: input, sourceCatalog }),
         text: { format: zodTextFormat(PlannerDecisionSchema, "campus_query_plan") },
       },

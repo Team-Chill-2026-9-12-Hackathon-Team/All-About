@@ -1,8 +1,16 @@
-import { RuleBasedExtractor } from "./extract/rule-based-extractor.ts";
-import type { CandidateExtractor } from "./extract/types.ts";
-import { resolveConflicts } from "./conflicts/resolve-conflicts.ts";
-import { quoteExists } from "./text.ts";
-import type { AnswerBundle, BrowserBatch, Claim, Evidence, QueryPlan } from "./types.ts";
+import type {
+  AnswerBlock,
+  AnswerBundle,
+  BrowserBatch,
+  Claim,
+  Evidence,
+  QueryPlan,
+} from "@allabout/contracts";
+
+import { RuleBasedExtractor } from "./extract/rule-based-extractor.js";
+import type { CandidateExtractor } from "./extract/types.js";
+import { resolveConflicts } from "./conflicts/resolve-conflicts.js";
+import { quoteExists } from "./text.js";
 
 const MONTHS: Record<string, string> = {
   january: "01", february: "02", march: "03", april: "04",
@@ -13,11 +21,15 @@ const MONTHS: Record<string, string> = {
 function parseDate(raw: string): Claim["dateValue"] {
   const match = raw.match(/([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})/);
   if (!match) return { precision: "unknown", raw };
-  const month = MONTHS[match[1].toLowerCase()];
+  const [, monthName, day, year] = match;
+  if (monthName === undefined || day === undefined || year === undefined) {
+    return { precision: "unknown", raw };
+  }
+  const month = MONTHS[monthName.toLowerCase()];
   if (!month) return { precision: "unknown", raw };
   return {
     precision: "date",
-    date: `${match[3]}-${month}-${match[2].padStart(2, "0")}`,
+    date: `${year}-${month}-${day.padStart(2, "0")}`,
     timezone: null,
   };
 }
@@ -72,16 +84,28 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
     });
 
     const resolved = resolveConflicts(claims, evidence, batch.pages);
+    const toBlock = (claim: Claim): AnswerBlock => ({
+      text: claim.text,
+      claimIds: [claim.id],
+      evidenceIds: claim.evidenceIds,
+    });
+    const supportedClaims = resolved.claims.filter(
+      (claim) => claim.status === "supported",
+    );
     return {
       schemaVersion: "1",
       runId: plan.runId,
-      summary: resolved.claims
-        .filter((claim) => claim.status === "supported")
-        .map((claim) => ({
-        text: claim.text,
-        claimIds: [claim.id],
-        evidenceIds: claim.evidenceIds,
-      })),
+      mode: plan.input.mode,
+      scope: plan.input.scope,
+      summary: supportedClaims
+        .filter((claim) => claim.nature === "fact" && claim.field !== "submission_format")
+        .map(toBlock),
+      requirements: supportedClaims
+        .filter((claim) => claim.nature === "fact" && claim.field === "submission_format")
+        .map(toBlock),
+      communityNotes: supportedClaims
+        .filter((claim) => claim.nature === "opinion")
+        .map(toBlock),
       unknowns: resolved.claims.length === 0
         ? ["No supported facts were found in the checked pages."]
         : resolved.conflicts.some((item) => item.resolution === "unresolved")
@@ -92,6 +116,7 @@ export function createEvidenceEngine(extractor: CandidateExtractor) {
       conflicts: resolved.conflicts,
       keyDates: resolved.keyDates,
       coverage,
+      sources: batch.pages.map(({ text: _text, ...source }) => source),
       generatedAt: new Date().toISOString(),
     };
   };

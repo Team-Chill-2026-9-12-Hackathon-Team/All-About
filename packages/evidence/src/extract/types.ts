@@ -1,4 +1,4 @@
-import type { PageSnapshot, QueryPlan } from "../types.ts";
+import type { Authority, PageSnapshot, QueryPlan } from "@allabout/contracts";
 
 export type ExtractedCandidate = {
   snapshotId: string;
@@ -6,7 +6,7 @@ export type ExtractedCandidate = {
   text: string;
   quote: string;
   nature: "fact" | "opinion";
-  authority: "institution" | "instructor" | "ta" | "student" | "unknown";
+  authority: Authority;
   authorityBasis: string | null;
   dateRaw?: string;
 };

@@ -15,6 +15,8 @@ import {
 
 Validate every HTTP boundary, C/D adapter result, and persisted event before using it. The schemas validate structure. Cross-reference checks such as evidence-to-snapshot membership and quote matching belong to B4; semantic support, authority, scope, and conflict correctness remain D's responsibility.
 
+`QueryPlan.requestedFields` contains factual fields such as `deadline` and `submission_format`; it does not contain AnswerBundle UI section names. D maps supported facts into `summary`, `requirements`, `communityNotes`, and `keyDates`.
+
 ## Examples
 
 - `examples/query-input.json`: A → B input.

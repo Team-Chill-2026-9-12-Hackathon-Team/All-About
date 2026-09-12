@@ -1,4 +1,6 @@
-import type { CandidateExtractor, ExtractedCandidate } from "./types.ts";
+import type { PageSnapshot, QueryPlan } from "@allabout/contracts";
+
+import type { CandidateExtractor, ExtractedCandidate } from "./types.js";
 
 const DATE = /[A-Za-z]+\s+\d{1,2},\s*\d{4}/;
 
@@ -7,7 +9,11 @@ function sentences(text: string): string[] {
 }
 
 export class RuleBasedExtractor implements CandidateExtractor {
-  async extract(plan, snapshots, signal): Promise<ExtractedCandidate[]> {
+  async extract(
+    plan: QueryPlan,
+    snapshots: PageSnapshot[],
+    signal: AbortSignal,
+  ): Promise<ExtractedCandidate[]> {
     const results: ExtractedCandidate[] = [];
 
     for (const snapshot of snapshots) {

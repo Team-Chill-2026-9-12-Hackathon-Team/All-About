@@ -1,5 +1,6 @@
-import { buildAnswer } from "./index.ts";
-import type { BrowserBatch, QueryPlan, Scope } from "./types.ts";
+import type { BrowserBatch, QueryPlan, Scope, SourceConfig } from "@allabout/contracts";
+
+import { buildAnswer } from "./index.js";
 
 const scope: Scope = {
   school: "University of Toronto",
@@ -12,8 +13,23 @@ const scope: Scope = {
 
 const plan: QueryPlan = {
   runId: "smoke-run",
+  input: {
+    query: "When does registration close?",
+    scope,
+    mode: "LIVE_FIXTURE",
+  },
   requestedFields: ["deadline"],
-  targets: [{ id: "official-event" }],
+  targets: [{
+    id: "official-event",
+    label: "Synthetic official event fixture",
+    kind: "official",
+    entryUrl: "https://example.test/event",
+    allowedHosts: ["example.test"],
+    scope,
+    contentMode: "fixture",
+    access: "public",
+  } satisfies SourceConfig],
+  budget: { maxPages: 3, maxSteps: 6, timeoutMs: 90_000 },
 };
 
 const batch: BrowserBatch = {

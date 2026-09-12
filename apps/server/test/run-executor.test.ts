@@ -135,7 +135,7 @@ describe("RunExecutor", () => {
           runId,
           input: plannedInput,
           targets: sources,
-          requestedFields: ["summary"],
+          requestedFields: ["deadline"],
           budget: { maxPages: 3, maxSteps: 6, timeoutMs: 90_000 },
         };
       },

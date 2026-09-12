@@ -35,7 +35,7 @@ const source: SourceConfig = {
 const planDecision = {
   decision: "plan",
   sourceIds: [source.id],
-  requestedFields: ["summary", "keyDates"],
+  requestedFields: ["deadline", "submission_format"],
   question: null,
   missingFields: [],
 };

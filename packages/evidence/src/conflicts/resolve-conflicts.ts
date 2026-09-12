@@ -1,4 +1,4 @@
-import type { Claim, Conflict, Evidence, KeyDate, PageSnapshot } from "../types.ts";
+import type { Claim, Conflict, Evidence, KeyDate, PageSnapshot } from "@allabout/contracts";
 
 function scopeKey(claim: Claim): string {
   return JSON.stringify(claim.scope);
@@ -39,7 +39,7 @@ export function resolveConflicts(
 
     const updates = group.filter((claim) => isExplicitUpdate(claim, evidenceById));
     if (updates.length === 1) {
-      const selected = updates[0];
+      const selected = updates[0]!;
       for (const claim of group) claim.status = claim.id === selected.id ? "supported" : "superseded";
       conflicts.push({
         id: `conflict-${conflicts.length + 1}`,
@@ -55,7 +55,7 @@ export function resolveConflicts(
       conflicts.push({
         id: `conflict-${conflicts.length + 1}`,
         claimIds: group.map((claim) => claim.id),
-        field: group[0].field,
+        field: group[0]!.field,
         resolution: "unresolved",
         selectedClaimId: null,
         explanation: "The sources disagree and no explicit update relationship was found.",

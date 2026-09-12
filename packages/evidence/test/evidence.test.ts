@@ -1,8 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildAnswer, createEvidenceEngine, quoteExists, resolveConflicts } from "../src/index.ts";
-import type { CandidateExtractor, Claim, Evidence, PageSnapshot } from "../src/index.ts";
-import type { BrowserBatch, QueryPlan, Scope } from "../src/types.ts";
+import type {
+  BrowserBatch,
+  Claim,
+  Evidence,
+  PageSnapshot,
+  QueryPlan,
+  Scope,
+  SourceConfig,
+} from "@allabout/contracts";
+
+import { buildAnswer, createEvidenceEngine, quoteExists, resolveConflicts } from "../src/index.js";
+import type { CandidateExtractor } from "../src/index.js";
 
 const scope: Scope = {
   school: "University of Toronto",
@@ -13,17 +22,38 @@ const scope: Scope = {
   entity: "Example event",
 };
 
+const source: SourceConfig = {
+  id: "official",
+  label: "Synthetic official fixture",
+  kind: "official",
+  entryUrl: "https://example.test",
+  allowedHosts: ["example.test"],
+  scope,
+  contentMode: "fixture",
+  access: "public",
+};
+
+function makePlan(runId: string, requestedFields: string[]): QueryPlan {
+  return {
+    runId,
+    input: {
+      query: "Synthetic evidence test",
+      scope,
+      mode: "LIVE_FIXTURE",
+    },
+    requestedFields,
+    targets: [source],
+    budget: { maxPages: 3, maxSteps: 6, timeoutMs: 90_000 },
+  };
+}
+
 test("quote validation tolerates whitespace differences", () => {
   assert.equal(quoteExists("Registration closes tomorrow.", "Registration\n closes   tomorrow."), true);
   assert.equal(quoteExists("Registration opens tomorrow.", "Registration closes tomorrow."), false);
 });
 
 test("buildAnswer creates a supported, cited deadline", async () => {
-  const plan: QueryPlan = {
-    runId: "test-run",
-    requestedFields: ["deadline"],
-    targets: [{ id: "official" }],
-  };
+  const plan = makePlan("test-run", ["deadline"]);
   const batch: BrowserBatch = {
     pages: [{
       id: "page-1",
@@ -45,12 +75,12 @@ test("buildAnswer creates a supported, cited deadline", async () => {
   const result = await buildAnswer(plan, batch, new AbortController().signal);
   assert.equal(result.claims.length, 1);
   assert.equal(result.evidence.length, 1);
-  assert.deepEqual(result.claims[0].dateValue, {
+  assert.deepEqual(result.claims[0]!.dateValue, {
     precision: "date",
     date: "2026-09-20",
     timezone: null,
   });
-  assert.equal(result.summary[0].evidenceIds[0], result.evidence[0].id);
+  assert.equal(result.summary[0]!.evidenceIds[0], result.evidence[0]!.id);
 });
 
 test("candidates with invented quotes are rejected", async () => {
@@ -68,11 +98,7 @@ test("candidates with invented quotes are rejected", async () => {
     },
   };
   const engine = createEvidenceEngine(badExtractor);
-  const result = await engine({
-    runId: "bad-quote",
-    requestedFields: ["deadline"],
-    targets: [{ id: "official" }],
-  }, {
+  const result = await engine(makePlan("bad-quote", ["deadline"]), {
     pages: [{
       id: "page-1",
       sourceId: "official",
@@ -96,11 +122,7 @@ test("candidates with invented quotes are rejected", async () => {
 });
 
 test("submission formats are extracted when requested", async () => {
-  const result = await buildAnswer({
-    runId: "format-test",
-    requestedFields: ["submission_format"],
-    targets: [{ id: "official" }],
-  }, {
+  const result = await buildAnswer(makePlan("format-test", ["submission_format"]), {
     pages: [{
       id: "page-format",
       sourceId: "official",
@@ -118,8 +140,8 @@ test("submission formats are extracted when requested", async () => {
     cleanup: "released",
   }, new AbortController().signal);
 
-  assert.equal(result.claims[0].field, "submission_format");
-  assert.equal(result.evidence[0].quote, "Submit the final report as a PDF.");
+  assert.equal(result.claims[0]!.field, "submission_format");
+  assert.equal(result.evidence[0]!.quote, "Submit the final report as a PDF.");
 });
 
 function conflictInputs(secondQuote: string, secondAuthority: Evidence["authority"]) {
@@ -155,8 +177,8 @@ function conflictInputs(secondQuote: string, secondAuthority: Evidence["authorit
 test("an explicit instructor extension supersedes the old deadline", () => {
   const input = conflictInputs("The deadline has been extended to September 20.", "instructor");
   const result = resolveConflicts(input.claims, input.evidence, input.snapshots);
-  assert.equal(result.conflicts[0].resolution, "explicit_update");
-  assert.equal(result.conflicts[0].selectedClaimId, "new");
+  assert.equal(result.conflicts[0]!.resolution, "explicit_update");
+  assert.equal(result.conflicts[0]!.selectedClaimId, "new");
   assert.equal(result.claims.find((item) => item.id === "old")?.status, "superseded");
   assert.deepEqual(result.keyDates.map((item) => item.claimId), ["new"]);
 });
@@ -164,8 +186,8 @@ test("an explicit instructor extension supersedes the old deadline", () => {
 test("different dates without update language remain unresolved", () => {
   const input = conflictInputs("The deadline is September 20.", "institution");
   const result = resolveConflicts(input.claims, input.evidence, input.snapshots);
-  assert.equal(result.conflicts[0].resolution, "unresolved");
-  assert.equal(result.conflicts[0].selectedClaimId, null);
+  assert.equal(result.conflicts[0]!.resolution, "unresolved");
+  assert.equal(result.conflicts[0]!.selectedClaimId, null);
   assert.ok(result.claims.every((item) => item.status === "conflict"));
   assert.ok(result.keyDates.every((item) => item.status === "needs_confirmation"));
 });

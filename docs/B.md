@@ -18,11 +18,13 @@
 - B2 RunStore 切片：创建 run 时先持久 queued 事件；实现单活动 run、严格状态转换、澄清上下文合并、幂等取消、递增事件序号、历史补发和实时订阅。
 - B2 HTTP/SSE 切片：实现来源公开摘要、创建/恢复任务、提交澄清、取消任务和事件流；事件流支持终态迟连接补发、`Last-Event-ID` 断点续传及无效/超前游标错误。
 - B3 注入式执行器首片：按 planning → browsing → synthesizing → completed/partial/failed 驱动 RunStore，将浏览信号映射为公共事件；每个任务使用独立 AbortController，取消后的迟到结果不会写回。
-- 增加两个仅供自动化测试使用的可控 mock adapter；其内容明确标注为 synthetic fixture，不通过默认产品接口冒充实时 UTSG 数据。真实 C/D 依赖尚未接入。
+- 增加两个仅供自动化测试使用的可控 mock adapter；其内容明确标注为 synthetic fixture，不通过默认产品接口冒充实时 UTSG 数据。真实 C 依赖尚未接入。
 - B3 超时与澄清切片：活动处理预算到期会 abort adapter 并稳定进入 failed；needs_input 使用独立等待时限，提交澄清后在同一 run 上继续，过期前不会启动浏览器。
 - B4 边界校验首片：D 候选答案在写入前验证 run/mode/scope、一致且唯一的 ID、所有引用、规划来源范围，并以规范化空白后的原文检查 evidence quote；损坏答案进入稳定 failed，不污染 run 快照。
-- B4 OpenAI 规划器首片：按官方 Responses API Structured Outputs 用法提供可注入规划器，模型只看到去 URL 的 registry 摘要；服务端再次限制来源 ID、用户 allowlist、access、scope、运行模式和 3/3/6/90s 预算。模型名称只读取调用方配置，未调用真实 API。
+- B4 OpenAI 规划器首片：按官方 Responses API Structured Outputs 用法提供可注入规划器，模型只看到去 URL 的 registry 摘要；服务端再次限制来源 ID、用户 allowlist、access、scope、运行模式和 3/3/6/90s 预算。模型名称只读取调用方配置。
 - 用户已指定应用 API 模型为 `gpt-5-mini`；本地忽略的 `.env` 已设置 `OPENAI_MODEL=gpt-5-mini`。API key 保持原值且未输出、未暂存。
+- 已合入 D 的 `origin/feat/evidence` 并保留其提交历史；删除 D 的临时重复类型，改为直接消费 `@allabout/contracts`，补齐 AnswerBundle 的 mode/scope/requirements/communityNotes/sources，并将 D 包正式链接进 server workspace。
+- 统一 `QueryPlan.requestedFields` 语义为事实字段而非 UI 区块；当前规划 schema 支持 deadline、submission_format、eligibility、location、registration_process、contact、other，D 当前规则提取器已实现前两项，其余会诚实落入 unknown/partial。
 
 ## 验证与同步
 
@@ -46,12 +48,14 @@
 - `gpt-5-mini` 真实最小规划 smoke 通过：Responses API 返回 plan，并且服务端最终只接受 synthetic allowlist source；请求未使用真实 UTSG 事实。可复现命令：`npm run smoke:planner --workspace @allabout/server`。
 - 已合入 `origin/main` 的 A 前端提交。按 A 的 pnpm 锁文件独立安装后，6 个 `node:test` 测试和 production build 均通过；A 当前 README 写有 `pnpm test`，但 package 尚无 test script，实际验证命令为 `node --test tests/history.test.mjs`。
 - 根 npm workspace 明确限定为 `apps/server` 与 `packages/*`，避免 npm 改写 A 的独立 pnpm 前端；根 Vitest 配置排除 `apps/web` 的 Node test，防止两种测试运行器互相误收集。是否最终统一包管理器仍需团队决定。
+- D 适配后严格 TypeScript 检查、6 个原有 Node tests 和 synthetic smoke 均通过。新增 1 个 B→D 集成测试：B 执行器调用 D 的真实 buildAnswer，答案经过 B 引用校验后进入 completed。
+- 当前根级 `npm test` 通过：server 41、contracts 7、evidence 6，共 54 个测试；另有 A 前端 6 个独立 Node tests 及 production build 通过。`gpt-5-mini` 在事实字段 schema 更新后再次通过最小真实规划 smoke。
 
 ## 当前边界
 
-- B0 本地实现已完成；B1 v1 契约草案已实现并通过测试，等待 A/C/D 评审后才可标记冻结。C/D 均未接入，暂无端到端结果。
+- B0 本地实现已完成；B1 v1 契约草案已实现并通过测试，D 已在 B 集成分支完成类型适配，仍等待 A/C 的正式评审后才可标记冻结。C 尚未接入；B→D 仅以 synthetic BrowserBatch 验证，暂无真实浏览端到端结果。
 - 实际 Git checkout：`C:\Users\xuziq\Desktop\hackthon\work\github-sync`。
 - 真实密钥已安全复制到此 checkout 的 `.env`，该文件被 Git 忽略；未输出或暂存密钥。
 - 当前 Codex 运行环境能运行 Node，但没有全局 `npm` 命令；通过临时 npm 12.0.2 完成依赖安装。团队普通 Node/npm 环境可直接使用锁文件；本地后续检查可直接调用已安装工具。
 - 正常团队命令：`npm install`、`npm run dev:server`、`npm run typecheck`、`npm test`。当前 Codex 终端的验证使用锁文件中相同工具直接执行，并额外完成真实服务烟测。
-- 下一步：检查 D 的 `feat/evidence` 公共入口与共享契约差异，先形成适配或变更提案；同时明确更细的清理生命周期。C 分支尚未出现。具体演示课程/活动尚未选定，推进到依赖该选择的步骤时及时问用户。
+- 下一步：在 C 尚未交付时先修复默认 server 缺少执行依赖却接受 POST 后永久 queued 的行为，并形成 authority/cleanup 契约提案；真实浏览集成仍等待 C 分支。具体演示课程/活动尚未选定，推进到依赖该选择的步骤时及时问用户。

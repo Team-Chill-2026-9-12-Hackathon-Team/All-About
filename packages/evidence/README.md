@@ -10,14 +10,13 @@ Minimal standalone D-module scaffold. It currently demonstrates:
 - explicit deadline-update and unresolved-conflict handling
 - confirmed vs. needs-confirmation key dates
 - source coverage reporting
-- zero external runtime dependencies
+- shared contract imports from `@allabout/contracts`
 
-Run on Node.js 24+:
+Run on Node.js 20+ from the repository workspace:
 
 ```bash
 npm run smoke
 npm test
 ```
 
-The types in `src/types.ts` are temporary. Replace them with imports from
-`@allabout/contracts` after B publishes the shared package.
+The package now consumes B's shared v1 contract. Synthetic fixtures remain test-only.

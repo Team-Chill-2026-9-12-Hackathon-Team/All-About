@@ -165,7 +165,7 @@ export class RunExecutor {
       runId,
       input,
       targets,
-      requestedFields: ["summary", "requirements", "communityNotes", "keyDates"],
+      requestedFields: ["deadline", "submission_format"],
       budget: { maxPages: 3, maxSteps: 6, timeoutMs: 90_000 },
     });
   }
