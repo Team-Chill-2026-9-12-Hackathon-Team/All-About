@@ -79,6 +79,32 @@ export class RuleBasedExtractor implements CandidateExtractor {
             authorityBasis,
           });
         }
+
+        if ((plan.requestedFields.includes("requirements") || plan.requestedFields.includes("prerequisite")) &&
+            /(?:requirement|prerequisite|must have|required|required to|eligib(?:le|ility))/i.test(sentence)) {
+          results.push({
+            snapshotId: snapshot.id,
+            field: "requirements",
+            text: sentence,
+            quote: sentence,
+            nature: "fact",
+            authority,
+            authorityBasis,
+          });
+        }
+
+        if (plan.requestedFields.includes("eligibility") &&
+            /(?:eligib(?:le|ility)|open to|available to|for students)/i.test(sentence)) {
+          results.push({
+            snapshotId: snapshot.id,
+            field: "eligibility",
+            text: sentence,
+            quote: sentence,
+            nature: "fact",
+            authority,
+            authorityBasis,
+          });
+        }
       }
     }
 

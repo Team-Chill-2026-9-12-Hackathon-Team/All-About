@@ -161,6 +161,16 @@ test("identical activity claims are deduplicated while retaining evidence", asyn
   assert.equal(result.claims[0].evidenceIds.length, 2);
 });
 
+test("requirements and prerequisites produce cited claims", async () => {
+  const result = await buildAnswer({ runId: "requirements", requestedFields: ["requirements", "eligibility"], targets: [{ id: "calendar" }] }, {
+    pages: [{ id: "requirements-page", sourceId: "calendar", url: "https://example.test/course", title: "Course requirements", text: "Prerequisite: CSC108H1. Students must have completed the prerequisite. This course is open to students in Arts and Science.", fetchedAt: "2026-09-12T12:00:00-04:00", publishedAt: null, updatedAt: null, scope, kind: "official", contentMode: "fixture" }],
+    failures: [], cleanup: "released",
+  }, new AbortController().signal);
+  assert.deepEqual(result.claims.map((claim) => claim.field), ["requirements", "requirements", "eligibility"]);
+  assert.equal(result.requirements.length, 2);
+  assert.equal(result.summary.length, 1);
+});
+
 function conflictInputs(secondQuote: string, secondAuthority: Evidence["authority"]) {
   const claims: Claim[] = [
     {
