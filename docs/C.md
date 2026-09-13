@@ -53,8 +53,8 @@ npm run smoke --prefix packages/browser
 | [Timetable Builder](https://ttb.utoronto.ca/) | 学期实际开课、section、时间地点等 | 4/5 | Steel 可读搜索表单；尚未完成 division/session 选择或课程搜索。官方说明它不检查个人选课资格、不执行选课 | P1，预留 2–4h 技术预算 |
 | [A&S academic dates](https://www.artsci.utoronto.ca/current/dates-deadlines/academic-dates) | 选课/退课等学术日期 | 3–4/5 | web 阅读遇到人机验证；Steel HTTP200 但仅56字符，NO_MATCH。不能将状态码200写成采集成功 | 有界排查后再决定 |
 | [The Varsity](https://thevarsity.ca/about/) | 校园新闻、学生视角 | 2–3/5 | 学生报纸，非教师政策；网页研究已核实，Steel/具体文章未测 | P1 背景补充 |
-| [Reddit r/UofT](https://www.reddit.com/r/UofT/) | 学生经验、课程讨论 | 4–5/5 + 访问条件 | 未做 Steel 采集；需确认获准 API/数据访问。分页、排序、删帖、作者匿名、校区/学期混杂增加难度 | 首版外链，获准后接 |
-| [Rate My Professors](https://www.ratemyprofessors.com/) | 教师评价、主观难度 | 4–5/5 + 许可条件 | 条款要求事先许可后自动访问；未做 Steel 采集。需处理教师同名、校区、评论年代和样本偏差 | 首版外链，获准后接 |
+| [Reddit r/UofT](https://www.reddit.com/r/UofT/) | 学生经验、课程讨论 | 4–5/5 + 访问条件 | 已完成真实 Steel 会话验收：网页页壳会被登录/403 拦截，改用公开 RSS feed；一次低频读取获得 25 条帖子快照、25 条证据，cleanup=released。RSS 被 429/403 时必须保留阻断状态，并等待 OAuth/API 许可 | P0，RSS 已接；OAuth/API 为后续增强 |
+| [Rate My Professors](https://www.ratemyprofessors.com/) | 教师评价、主观难度 | 4–5/5 + 许可条件 | 主页可人工打开；官方条款禁止未经许可的自动 scrape/crawl/spider。当前提供手动外链，不把 RMP 页面伪装成后端证据；获得书面许可或授权供应商 API 后再接适配器 | P0 外链；授权后接 |
 | [Quercus](https://q.utoronto.ca/) / [ACORN](https://www.acorn.utoronto.ca/) | 私有课程公告、个人选课信息 | 5/5 | 官方确认 UTORid 登录；尚无本项目授权会话和隔离验收，不使用本机登录态 | 后续独立连接器 |
 | [ULife](https://www.ulife.utoronto.ca/organizations) | 社团发现 | 未定，暂估3/5 | 旧资料有入口；本次 web 无法打开，当前可用性未确认，不能当已可用数据源 | 暂缓 |
 
@@ -97,6 +97,7 @@ Hart House / Xplore 详情页当前会被 Cloudflare 拦截，不能当作本轮
 ## 证据与限制
 
 - [Calendar CSC207](https://artsci.calendar.utoronto.ca/course/csc207h1)、[CSC148](https://artsci.calendar.utoronto.ca/course/csc148h1)：真实 Steel 读取验证。
+- [Reddit r/UofT RSS](https://www.reddit.com/r/UofT/.rss)：真实 Steel 会话中通过低频公开 feed 读取；网页页壳的登录/403 不再被误报为成功。
 - [Timetable 官方说明](https://easi.its.utoronto.ca/student-information-systems/timetable-builder/)：数据覆盖与用途。
 - [Reddit API terms](https://redditinc.com/policies/data-api-terms)、[Reddit 自动访问规则](https://support.reddithelp.com/hc/en-us/articles/360043512931-Don-t-break-the-site)：获准访问前提。
 - [RMP terms](https://www.ratemyprofessors.com/terms-of-use)：事先许可要求。

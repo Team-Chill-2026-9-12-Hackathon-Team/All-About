@@ -30,12 +30,7 @@ const requestedFieldSchema = z.enum([
   "other",
 ]);
 
-function isAssignmentQuery(input: QueryInput): boolean {
-  return /(?:assignment|homework|problem set|\ba2\b|due date|deadline)/i.test(input.query);
-}
-
 function isCourseQuery(input: QueryInput): boolean {
-  if (isAssignmentQuery(input)) return false;
   return (
     input.scope.course !== null ||
     /\b[a-z]{3}\s?-?\s?\d{3}(h1|y1)?\b/i.test(input.query)
@@ -130,10 +125,7 @@ export function materializePlannerDecision(
   });
 
   const requestedFields = new Set(decision.requestedFields);
-  if (input.mode === "LIVE_WEB" && isAssignmentQuery(input)) {
-    requestedFields.add("deadline");
-    requestedFields.add("submission_format");
-  } else if (input.mode === "LIVE_WEB" && isCourseQuery(input)) {
+  if (input.mode === "LIVE_WEB" && isCourseQuery(input)) {
     requestedFields.add("requirements");
     requestedFields.add("eligibility");
   } else if (input.mode === "LIVE_WEB") {
@@ -175,7 +167,7 @@ export function createOpenAiRunPlanner({
         model,
         store: false,
         instructions:
-          "Route the campus question only to IDs in the supplied source catalog and select factual requested fields, not UI section names. Prefer up to three distinct pages. For assignment due dates prefer the matching course calendar plus Piazza and Quercus when those IDs exist. Never select a course calendar whose course code differs from the asked course. Do not invent URLs or facts. Authorized sources may auto-login from the keychain; still select them when they can hold the answer. Ask one concise clarification only when scope ambiguity prevents safe source selection.",
+          "Route the campus question only to IDs in the supplied source catalog and select factual requested fields, not UI section names. Prefer up to three distinct pages. Prefer official Academic Calendar and Registrar sources for program, degree, graduation, and policy questions. Never select a course calendar whose course code differs from the asked course. Do not invent URLs or facts. Authorized sources may auto-login from the keychain; still select them when they can hold the answer. Ask one concise clarification only when scope ambiguity prevents safe source selection.",
         input: JSON.stringify({ queryInput: input, sourceCatalog }),
         text: { format: zodTextFormat(PlannerDecisionSchema, "campus_query_plan") },
       },

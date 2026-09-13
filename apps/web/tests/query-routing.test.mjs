@@ -35,15 +35,15 @@ describe('question routing', () => {
     ]);
   });
 
-  it('opens Piazza and Quercus for assignment due dates', () => {
-    assert.equal(classifyQuestion('When is CSC207 Assignment 2 due?'), 'assignment');
-    const input = buildQueryInput('When is CSC207 Assignment 2 due?');
+  it('routes CS program and graduation questions to the official Calendar and department', () => {
+    assert.equal(classifyQuestion('What are the graduation requirements for the Computer Science Specialist?'), 'program');
+    const input = buildQueryInput('What are the graduation requirements for the Computer Science Specialist?');
     assert.deepEqual(input.sourceIds, [
-      'academic-calendar-csc207',
-      'piazza-login',
-      'quercus-login',
+      'academic-calendar-cs-specialist',
+      'cs-program-entry-cmp1',
+      'uoft-registrar',
     ]);
-    assert.equal(input.scope.course, 'CSC207H1');
+    assert.equal(input.scope.entity, 'Computer Science Specialist');
   });
 
   it('keeps every DEMO101 question inside the labeled fixture corpus', () => {
@@ -59,10 +59,14 @@ describe('question routing', () => {
   });
 
   it('does not silently substitute CSC207 for an unknown course', () => {
-    const input = buildQueryInput('When is MAT223 Assignment 2 due?');
-    assert.deepEqual(input.sourceIds, ['piazza-login', 'quercus-login']);
+    const input = buildQueryInput('What are the prerequisites for MAT223?');
+    assert.deepEqual(input.sourceIds, ['academic-calendar-course-search', 'timetable-builder', 'cs-undergrad-courses']);
     assert.equal(input.scope.course, 'MAT223H1');
-    assert.equal(input.scope.entity, 'Assignment 2');
+  });
+
+  it('routes general campus questions to student services rather than a CS course', () => {
+    const input = buildQueryInput('Where can I find support as a current student?');
+    assert.deepEqual(input.sourceIds, ['uoft-current-students', 'uoft-registrar', 'student-life-events']);
   });
 });
 
@@ -72,7 +76,7 @@ describe('fixed search architecture', () => {
       ['What are the prerequisites for CSC207H1?', 3],
       ['When is the Labour Day Carillon Recital?', 2],
       ['When is the Arts & Science December 2026 exam period?', 3],
-      ['When is CSC207 Assignment 2 due?', 3],
+      ['What are the graduation requirements for the Computer Science Specialist?', 3],
     ];
     for (const [question, count] of cases) {
       const plan = detectSearch(question);
@@ -99,7 +103,7 @@ describe('fixed search architecture', () => {
     for (const site of hard) {
       assert.ok(site.solution.length > 20);
     }
-    assert.equal(coverageForKind('assignment').some((site) => site.id === 'quercus-login'), true);
+    assert.equal(coverageForKind('program').some((site) => site.id === 'academic-calendar-cs-specialist'), true);
     assert.equal(coverageForKind('course').some((site) => site.id === 'timetable-builder'), true);
     assert.equal(coverageForKind('event').some((site) => site.id === 'hart-house-events'), true);
   });

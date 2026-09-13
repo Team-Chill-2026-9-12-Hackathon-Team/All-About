@@ -1,6 +1,6 @@
 export const SOURCE_FALLBACKS: Record<string, string> = {
-  'reddit-uoft-csc207': 'https://old.reddit.com/r/UofT/',
-  'reddit-uoft': 'https://old.reddit.com/r/UofT/',
+  'reddit-uoft-csc207': 'https://www.reddit.com/r/UofT/.rss',
+  'reddit-uoft': 'https://www.reddit.com/r/UofT/.rss',
   'hart-house-events': 'https://www.utoronto.ca/events',
   'artsci-academic-dates': 'https://artsci.calendar.utoronto.ca/sessional-dates',
   'artsci-exam-conflicts': 'https://artsci.calendar.utoronto.ca/sessional-dates',

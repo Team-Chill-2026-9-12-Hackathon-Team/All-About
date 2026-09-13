@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AllAbout Campus — simplified UI preview</title>
+  <style>
+    :root { color-scheme: light; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+    body { margin: 0; background: #f5f2eb; color: #14181f; }
+    main { width: min(1120px, calc(100% - 32px)); margin: 28px auto 48px; }
+    h1 { font-size: 28px; letter-spacing: -0.03em; margin: 0 0 8px; }
+    p { color: #5c6570; line-height: 1.5; max-width: 60ch; }
+    .note { margin: 16px 0 28px; padding: 12px 14px; border: 1px solid #d7dbe3; border-radius: 8px; background: #fff; font-size: 14px; }
+    section { margin-bottom: 36px; }
+    h2 { font-size: 15px; margin: 0 0 10px; letter-spacing: 0.04em; text-transform: uppercase; color: #6b7585; }
+    img { width: 100%; border: 1px solid #d7dbe3; border-radius: 12px; background: #fff; display: block; }
+    ul { margin: 8px 0 0; padding-left: 18px; color: #3a4452; line-height: 1.55; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>简化后预览（未改产品代码）</h1>
+    <p>对照先前计划：砍掉第二页工具选择、登录更克制、Desk 直达提问、来源用列表而非彩色营销卡。</p>
+    <div class="note">这些是视觉稿预览，不是已上线实现。路径：<code>docs/preview/</code></div>
+
+    <section>
+      <h2>1 · Login</h2>
+      <img src="./allabout-preview-login.png" alt="Simplified login preview" />
+      <ul>
+        <li>去掉彩色侧栏与装饰网格</li>
+        <li>居中表单 + 一句品牌</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>2 · Desk empty（无第二页）</h2>
+      <img src="./allabout-preview-desk-empty.png" alt="Simplified empty desk preview" />
+      <ul>
+        <li>登录后直接进 Desk</li>
+        <li>顶栏只留状态 / Keychain / History</li>
+        <li>两个 starter，不再四色工具卡</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>3 · Answer ready</h2>
+      <img src="./allabout-preview-desk-answer.png" alt="Simplified answer desk preview" />
+      <ul>
+        <li>左侧步骤 + 来源行列表</li>
+        <li>右侧 brief + evidence chips</li>
+        <li>DEMO DATA 诚实标注</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

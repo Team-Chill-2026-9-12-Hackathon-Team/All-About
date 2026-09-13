@@ -248,9 +248,15 @@ export const SOURCE_META: Record<string, {label: string; url: string}> = {
   'academic-calendar-csc207': {label: 'CSC207 calendar', url: 'https://artsci.calendar.utoronto.ca/course/csc207h1'},
   'academic-calendar-csc148': {label: 'CSC148 calendar', url: 'https://artsci.calendar.utoronto.ca/course/csc148h1'},
   'cs-undergrad-courses': {label: 'CS department', url: 'https://web.cs.toronto.edu/undergraduate/courses'},
+  'academic-calendar-course-search': {label: 'A&S course search', url: 'https://artsci.calendar.utoronto.ca/search-courses'},
+  'academic-calendar-cs-specialist': {label: 'CS Specialist calendar', url: 'https://artsci.calendar.utoronto.ca/program/asspe1689'},
+  'academic-calendar-degree-requirements': {label: 'Degree requirements', url: 'https://artsci.calendar.utoronto.ca/degree-requirements-hba-hbsc-bcom'},
+  'cs-program-entry-cmp1': {label: 'CS program admission', url: 'https://web.cs.toronto.edu/undergraduate/how-to-apply/cmp1'},
+  'uoft-current-students': {label: 'Current Students', url: 'https://www.utoronto.ca/current-students'},
+  'uoft-registrar': {label: 'University Registrar', url: 'https://www.registrar.utoronto.ca/'},
   'timetable-builder': {label: 'Timetable Builder', url: 'https://ttb.utoronto.ca/'},
-  'reddit-uoft-csc207': {label: 'Reddit r/UofT', url: 'https://old.reddit.com/r/UofT/'},
-  'reddit-uoft': {label: 'Reddit r/UofT', url: 'https://old.reddit.com/r/UofT/'},
+  'reddit-uoft-csc207': {label: 'Reddit r/UofT RSS', url: 'https://www.reddit.com/r/UofT/.rss'},
+  'reddit-uoft': {label: 'Reddit r/UofT RSS', url: 'https://www.reddit.com/r/UofT/.rss'},
   'piazza-login': {label: 'Piazza', url: 'https://piazza.com/login'},
   'quercus-login': {label: 'Quercus', url: 'https://q.utoronto.ca/'},
   'acorn-login': {label: 'ACORN', url: 'https://www.acorn.utoronto.ca/'},
@@ -647,7 +653,13 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
           return;
         }
         if (res.status !== 202) {
-          setTransportError(`Server rejected the run (HTTP ${res.status}).`);
+          const payload = await res.json().catch(() => null) as {error?: {message?: string}} | null;
+          const message = payload?.error?.message
+            ?? (res.status === 500
+              ? 'Campus server is unavailable. Restart with npm run dev, then open http://127.0.0.1:5174.'
+              : `Server rejected the run (HTTP ${res.status}).`);
+          setTransportError(message);
+          setRun((prev) => prev ? {...prev, status: 'failed', error: {code: 'RUN_CREATE_FAILED', message}} : prev);
           return;
         }
         const body = (await res.json()) as { runId: string; eventsUrl: string };

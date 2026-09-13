@@ -306,6 +306,12 @@ function defaultRequestedFields(input: QueryInput): QueryPlan["requestedFields"]
   const ids = input.sourceIds ?? [];
   const query = input.query;
   if (
+    ids.some((id) => id.startsWith("reddit-")) ||
+    /reddit|student discussion|what are students saying/i.test(query)
+  ) {
+    return ["community_note"];
+  }
+  if (
     ids.includes("artsci-exam-conflicts") ||
     ids.includes("academic-calendar-sessional-dates") ||
     /exam|deferred|conflict/i.test(query)
@@ -318,9 +324,6 @@ function defaultRequestedFields(input: QueryInput): QueryPlan["requestedFields"]
     /event|recital|carillon/i.test(query)
   ) {
     return ["event_date", "location", "event_description", "eligibility"];
-  }
-  if (/(?:assignment|homework|problem set|\ba2\b|due date|deadline)/i.test(query)) {
-    return ["deadline", "submission_format"];
   }
   return ["requirements", "eligibility"];
 }

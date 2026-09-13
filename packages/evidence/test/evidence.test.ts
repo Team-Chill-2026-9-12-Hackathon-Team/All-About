@@ -71,6 +71,32 @@ test("every requested but absent field is reported", async () => {
   assert.deepEqual(result.unknowns, ["The checked sources did not provide eligibility for Demo data · Fictional activity."]);
 });
 
+test("extracts a Calendar prerequisite when its label and value are on separate lines", async () => {
+  const courseScope = {...baseScope, course: "CSC207H1", entity: null};
+  const text = [
+    "CSC207H1: Software Design",
+    "Prerequisite",
+    "60% or higher in CSC148H1 / 60% or higher in CSC111H1.",
+  ].join("\n");
+  const result = await buildAnswer(plan(["requirements"], [source("calendar", courseScope)], courseScope), {
+    pages: [page("calendar-page", "calendar", text, courseScope)], failures: [], cleanup: "released",
+  }, new AbortController().signal);
+  assert.equal(result.claims.length, 1);
+  assert.equal(result.claims[0]?.field, "requirements");
+  assert.match(result.claims[0]?.text ?? "", /CSC148H1/);
+  assert.equal(result.evidence[0]?.quote, "Prerequisite\n60% or higher in CSC148H1 / 60% or higher in CSC111H1.");
+});
+
+test("extracts a Calendar prerequisite when the visible page flattens it onto one line", async () => {
+  const courseScope = {...baseScope, course: "CSC207H1", entity: null};
+  const text = "CSC207H1: Software Design\nPrerequisite 60% or higher in CSC148H1/ 60% or higher in CSC111H1\nExclusion CSC207H5";
+  const result = await buildAnswer(plan(["requirements"], [source("calendar", courseScope)], courseScope), {
+    pages: [page("calendar-page", "calendar", text, courseScope)], failures: [], cleanup: "released",
+  }, new AbortController().signal);
+  assert.match(result.claims[0]?.text ?? "", /CSC111H1/);
+  assert.equal(result.evidence[0]?.quote, "Prerequisite\n60% or higher in CSC148H1/ 60% or higher in CSC111H1");
+});
+
 test("duplicate facts merge only when the activity identity is the same", async () => {
   const sameA = { ...baseScope, entity: "Robotics Workshop" };
   const different = { ...baseScope, entity: "Robotics Social" };

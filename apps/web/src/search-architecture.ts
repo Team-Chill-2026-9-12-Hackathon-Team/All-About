@@ -1,4 +1,4 @@
-export type QueryKind = 'course' | 'event' | 'exam' | 'assignment' | 'general';
+export type QueryKind = 'course' | 'event' | 'exam' | 'program' | 'general';
 export type SearchPhase = 'detect' | 'split' | 'gather' | 'answer';
 
 export interface SearchBlueprint {
@@ -21,8 +21,8 @@ const COURSE_RE = /\b([a-z]{3})\s?-?\s?(\d{3})(h1|y1)?\b/i;
 
 export function classifyQuestion(question: string): QueryKind {
   if (/(?:exam|finals?|deferred|conflict)/i.test(question)) return 'exam';
-  if (/(?:assignment|homework|problem set|\ba\d+\b|due date|deadline|submission format|late penalty)/i.test(question)) return 'assignment';
   if (/(?:event|recital|carillon|hart house|workshop|orientation|club)/i.test(question)) return 'event';
+  if (/(?:program|major|minor|specialist|post\b|degree|graduat(?:e|ion)|academic calendar|毕业|专业|主修|辅修|学位)/i.test(question)) return 'program';
   if (COURSE_RE.test(question)) return 'course';
   return 'general';
 }
@@ -34,7 +34,7 @@ export function detectSearch(question: string): SearchBlueprint {
   const isCsc207 = /\bcsc\s?-?\s?207\b/i.test(question);
   const isCsc148 = /\bcsc\s?-?\s?148\b/i.test(question);
   const isCarillon = /carillon|labour day|soldiers.? tower/i.test(question);
-  const assignmentMatch = question.match(/(?:assignment|\ba)\s*-?\s*(\d+)/i);
+  const isComputerScienceProgram = /(?:computer science|\bcs\b|\bcsc\b|\bcmp1\b|计算机科学)/i.test(question);
   const course = isDemo101
     ? 'DEMO101'
     : isCsc207
@@ -59,24 +59,19 @@ export function detectSearch(question: string): SearchBlueprint {
     } else {
       sourceIds.push('uoft-events', 'student-life-events', 'hart-house-events');
     }
-  } else if (kind === 'assignment') {
-    if (isCsc207 || course === 'CSC207H1') {
-      sourceIds.push('academic-calendar-csc207', 'piazza-login', 'quercus-login');
-    } else if (isCsc148 || course === 'CSC148H1') {
-      sourceIds.push('academic-calendar-csc148', 'piazza-login', 'quercus-login');
-    } else {
-      sourceIds.push('piazza-login', 'quercus-login');
-    }
   } else if (kind === 'course') {
     if (isCsc207 || course === 'CSC207H1') {
       sourceIds.push('academic-calendar-csc207', 'cs-undergrad-courses', 'timetable-builder');
     } else if (isCsc148 || course === 'CSC148H1') {
       sourceIds.push('academic-calendar-csc148', 'cs-undergrad-courses', 'timetable-builder');
     } else {
-      sourceIds.push('timetable-builder');
+      sourceIds.push('academic-calendar-course-search', 'timetable-builder', 'cs-undergrad-courses');
     }
+  } else if (kind === 'program') {
+    sourceIds.push('academic-calendar-degree-requirements', 'uoft-registrar', 'uoft-current-students');
+    if (isComputerScienceProgram) sourceIds.splice(0, 1, 'academic-calendar-cs-specialist', 'cs-program-entry-cmp1');
   } else {
-    sourceIds.push('academic-calendar-csc207', 'student-life-events', 'uoft-events');
+    sourceIds.push('uoft-current-students', 'uoft-registrar', 'student-life-events');
   }
 
   const ids = [...new Set(sourceIds)].slice(0, 3);
@@ -85,16 +80,14 @@ export function detectSearch(question: string): SearchBlueprint {
     reason: reasonFor(kind, ids.length),
     sourceIds: ids,
     requestedFields: fieldsFor(kind),
-    course: kind === 'event' ? null : course,
+    course: kind === 'event' || kind === 'program' ? null : course,
     entity: kind === 'event'
       ? (isCarillon ? 'Labour Day Carillon Recital' : null)
       : kind === 'exam'
         ? 'final-exams'
-        : assignmentMatch
-          ? `Assignment ${assignmentMatch[1]}`
-          : isDemo101 || course === 'DEMO101'
-            ? 'Assignment 2'
-        : null,
+        : kind === 'program' && isComputerScienceProgram
+          ? 'Computer Science Specialist'
+          : null,
   };
 }
 
@@ -128,16 +121,16 @@ export function detectActivities(blueprint: SearchBlueprint, labels: Record<stri
 }
 
 function reasonFor(kind: QueryKind, count: number): string {
-  if (kind === 'assignment') return `Assignment lookup · ${count} public pages`;
   if (kind === 'exam') return `Exam lookup · ${count} faculty pages`;
   if (kind === 'event') return `Event lookup · ${count} campus listings`;
   if (kind === 'course') return `Course lookup · ${count} official and discussion pages`;
+  if (kind === 'program') return `Program and degree lookup · ${count} official pages`;
   return `Campus lookup · ${count} pages`;
 }
 
 function fieldsFor(kind: QueryKind): string[] {
-  if (kind === 'assignment') return ['deadline', 'submission_format'];
   if (kind === 'exam') return ['when', 'where'];
   if (kind === 'event') return ['name', 'when', 'where'];
+  if (kind === 'program') return ['requirements', 'eligibility'];
   return ['code', 'title', 'offering', 'prerequisites'];
 }

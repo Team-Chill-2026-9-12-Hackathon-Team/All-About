@@ -160,7 +160,13 @@ export function registerRunRoutes(
           "Another run is still active.",
         );
       }
-      throw error;
+      request.log.error(error, "Unable to create run");
+      return sendError(
+        reply,
+        500,
+        "RUN_CREATE_FAILED",
+        "The server could not start this investigation. Please retry the question.",
+      );
     }
   });
 

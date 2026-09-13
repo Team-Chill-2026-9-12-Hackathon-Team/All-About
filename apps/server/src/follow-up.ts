@@ -11,7 +11,7 @@ export function inheritParentQuery(input: QueryInput, parent: QueryInput): Query
     ...input,
     scope,
     mode: parent.mode,
-    ...(parent.sourceIds ? { sourceIds: parent.sourceIds } : input.sourceIds ? { sourceIds: input.sourceIds } : {}),
+    ...(input.sourceIds ? { sourceIds: input.sourceIds } : parent.sourceIds ? { sourceIds: parent.sourceIds } : {}),
     ...(input.parentRunId ? { parentRunId: input.parentRunId } : {}),
   };
 }

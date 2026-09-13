@@ -25,6 +25,12 @@ export { attemptCredentialLogin, loginHostsFor, type CredentialResolver } from '
 
 const MIN_TEXT_LENGTH = 100;
 const MAX_SESSION_MS = 5 * 60_000;
+// Live View is an audit surface, not a slideshow. Long artificial holds made
+// a three-source query wait roughly 17 seconds after content was already read.
+const CAPTURED_PAGE_HOLD_MS = 500;
+const FINAL_VIEWER_HOLD_MS = 800;
+const DEFAULT_REDDIT_USER_AGENT =
+  'AllAboutCampus/0.1 (read-only RSS; contact: allabout-campus@users.noreply.github.com)';
 
 export async function collectPages(
   plan: QueryPlan,
@@ -110,9 +116,22 @@ export async function collectPages(
       let activeTarget = target;
       for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
-          await collectTarget(page, activeTarget, plan, combinedSignal, emit, () => {
-            stepCount += 1;
-          }, pages, resolveCredential);
+          if (isRedditRssTarget(activeTarget)) {
+            await collectRedditRss(
+              activeTarget,
+              plan,
+              combinedSignal,
+              emit,
+              () => {
+                stepCount += 1;
+              },
+              pages,
+            );
+          } else {
+            await collectTarget(page, activeTarget, plan, combinedSignal, emit, () => {
+              stepCount += 1;
+            }, pages, resolveCredential);
+          }
           finalFailure = null;
           break;
         } catch (error) {
@@ -152,7 +171,7 @@ export async function collectPages(
       }).catch(() => undefined);
       emit({ type: 'step', sourceId: primary.sourceId, action: 'hold_for_viewer', url: primary.url });
       try {
-        await holdForViewer(8_000, combinedSignal);
+        await holdForViewer(FINAL_VIEWER_HOLD_MS, combinedSignal);
       } catch {
         /* snapshots are already stored */
       }
@@ -180,6 +199,130 @@ export async function collectPages(
   }
 
   return BrowserBatchSchema.parse({ pages, failures, cleanup });
+}
+
+function isRedditRssTarget(target: SourceConfig): boolean {
+  return (
+    new URL(target.entryUrl).hostname === 'www.reddit.com' &&
+    new URL(target.entryUrl).pathname.endsWith('.rss')
+  );
+}
+
+async function collectRedditRss(
+  target: SourceConfig,
+  plan: QueryPlan,
+  signal: AbortSignal,
+  emit: (signal: BrowserSignal) => void,
+  countStep: () => void,
+  pages: PageSnapshot[],
+): Promise<void> {
+  if (target.access !== 'public') {
+    throw new BrowserTargetError('AUTH_REQUIRED', 'The Reddit RSS source must remain public.', false);
+  }
+  if (plan.input.mode === 'REPLAY') {
+    throw new BrowserTargetError('UNSUPPORTED_SOURCE', 'Replay runs do not create live browser sessions.', false);
+  }
+
+  const entryUrl = assertAllowedUrl(target.entryUrl, target.allowedHosts);
+  countStep();
+  emit({ type: 'step', sourceId: target.id, action: 'fetch_public_rss', url: entryUrl.href });
+  const response = await fetch(entryUrl.href, {
+    headers: {
+      accept: 'application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8',
+      'user-agent': process.env.REDDIT_USER_AGENT?.trim() || DEFAULT_REDDIT_USER_AGENT,
+    },
+    signal,
+  });
+  const body = await response.text();
+  if (response.status === 401 || response.status === 403 || response.status === 429) {
+    throw new BrowserTargetError(
+      'ACCESS_BLOCKED',
+      `Reddit RSS returned HTTP ${response.status}; retry later or use an approved Reddit OAuth client.`,
+      false,
+    );
+  }
+  if (!response.ok) {
+    throw new BrowserTargetError('NAVIGATION_FAILED', `Reddit RSS returned HTTP ${response.status}.`, true);
+  }
+  const feed = parseRedditFeed(body);
+  if (feed.text.length < MIN_TEXT_LENGTH) {
+    throw new BrowserTargetError('NO_MATCH', 'Reddit RSS did not expose enough public post text.', true);
+  }
+
+  const fetchedAt = new Date().toISOString();
+  const snapshot: PageSnapshot = {
+    id: `${plan.runId}:${target.id}:${pages.length + 1}`,
+    sourceId: target.id,
+    url: entryUrl.href,
+    title: feed.title || target.label,
+    text: feed.text,
+    fetchedAt,
+    publishedAt: feed.publishedAt,
+    updatedAt: feed.updatedAt,
+    scope: { ...target.scope, entity: target.scope.entity ?? feed.title },
+    kind: target.kind,
+    contentMode: target.contentMode,
+  };
+  pages.push(snapshot);
+  emit({ type: 'page_read', snapshot });
+}
+
+interface ParsedRedditFeed {
+  title: string;
+  text: string;
+  publishedAt: string | null;
+  updatedAt: string | null;
+}
+
+function parseRedditFeed(xml: string): ParsedRedditFeed {
+  const entries = [...xml.matchAll(/<(?:entry|item)\b[\s\S]*?<\/(?:entry|item)>/gi)].slice(0, 25);
+  const title = xmlTagText(xml, 'title') || 'Reddit public RSS feed';
+  const lines = [`Feed: ${title}`];
+  let publishedAt: string | null = null;
+  let updatedAt: string | null = null;
+  for (const [index, match] of entries.entries()) {
+    const item = match[0];
+    const itemTitle = xmlTagText(item, 'title') || `Post ${index + 1}`;
+    const link = xmlLink(item);
+    const summary = xmlTagText(item, 'summary') || xmlTagText(item, 'description') || xmlTagText(item, 'content');
+    const dateRaw = xmlTagText(item, 'updated') || xmlTagText(item, 'pubDate') || xmlTagText(item, 'published');
+    const date = dateRaw ? parseIsoDate(dateRaw) : null;
+    if (!publishedAt && date) publishedAt = date;
+    if (date) updatedAt = date;
+    lines.push(`[${index + 1}] ${itemTitle}`);
+    if (dateRaw) lines.push(`Posted: ${dateRaw}`);
+    if (summary) lines.push(summary);
+    if (link) lines.push(`Reddit link: ${link}`);
+  }
+  return { title, text: lines.join('\n'), publishedAt, updatedAt };
+}
+
+function xmlTagText(xml: string, tag: string): string | null {
+  const match = xml.match(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+  if (!match?.[1]) return null;
+  return decodeXml(match[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function xmlLink(xml: string): string | null {
+  const href = xml.match(/<link\b[^>]*href=["']([^"']+)["'][^>]*>/i)?.[1];
+  if (href) return decodeXml(href).trim();
+  return xml.match(/<link\b[^>]*>([\s\S]*?)<\/link>/i)?.[1]?.trim() || null;
+}
+
+function decodeXml(value: string): string {
+  return value
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code: string) => String.fromCodePoint(Number.parseInt(code, 16)));
+}
+
+function parseIsoDate(value: string): string | null {
+  const time = Date.parse(value);
+  return Number.isNaN(time) ? null : new Date(time).toISOString();
 }
 
 async function createSessionWithRetry(
@@ -324,7 +467,7 @@ async function collectTarget(
   emit({ type: 'page_read', snapshot });
   emit({ type: 'step', sourceId: target.id, action: 'hold_for_viewer', url: capturedUrl.href });
   try {
-    await holdForViewer(3_000, signal);
+    await holdForViewer(CAPTURED_PAGE_HOLD_MS, signal);
   } catch {
     // The page is already captured; a cancelled hold must not drop the snapshot.
   }

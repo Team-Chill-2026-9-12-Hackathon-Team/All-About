@@ -50,6 +50,15 @@ function trimUrl(value: string): string {
   return value.replace(/[),.;!?]+$/g, "");
 }
 
+function labeledValue(text: string, labels: string[]): { quote: string; value: string } | null {
+  const escaped = labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const match = text.match(new RegExp(`(?:^|\\n)\\s*(${escaped})\\s*:?\\s*(?:\\n\\s*|[ \\t]+)([^\\n]+)`, "i"));
+  if (!match?.[1] || !match[2]) return null;
+  const value = match[2].replace(/\s+/g, " ").trim();
+  if (!value) return null;
+  return { quote: `${match[1].trim()}\n${match[2].trim()}`, value };
+}
+
 export class RuleBasedExtractor implements CandidateExtractor {
   constructor(private readonly registry: AuthorityRegistry = DEFAULT_AUTHORITY_REGISTRY) {}
 
@@ -66,12 +75,34 @@ export class RuleBasedExtractor implements CandidateExtractor {
       const registered = this.registry[snapshot.sourceId];
       const authority: Authority = registered?.authority ?? (snapshot.kind === "official" ? "institution" : "unknown");
       const authorityBasis = registered?.basis ?? (snapshot.kind === "official" ? "Source is registered as official" : null);
+      const communitySource = snapshot.kind === "community";
       const titleQuote = snapshot.title.trim();
       if (requested(plan, "event_name") && titleQuote && snapshot.text.includes(titleQuote)) {
         results.push(candidate(snapshot, "event_name", titleQuote, titleQuote, authority, authorityBasis, { dedupeValue: titleQuote }));
       }
 
+      if (!communitySource && requested(plan, "requirements", "prerequisite")) {
+        const prerequisite = labeledValue(snapshot.text, ["Prerequisite", "Prerequisites", "Requirement", "Requirements"]);
+        if (prerequisite) {
+          results.push(candidate(
+            snapshot,
+            "requirements",
+            `Prerequisite: ${prerequisite.value}`,
+            prerequisite.quote,
+            authority,
+            authorityBasis,
+            { dedupeValue: prerequisite.value },
+          ));
+        }
+      }
+
       for (const sentence of segments(snapshot.text)) {
+        if (communitySource && /^\[\d+\]\s+/.test(sentence) && sentence.length > 18) {
+          results.push({
+            ...candidate(snapshot, "community_note", sentence, sentence, "student", "Public Reddit RSS post title"),
+            nature: "opinion",
+          });
+        }
         const url = sentence.match(URL)?.[0];
         if (requested(plan, "registration_link") && url && /(?:register|registration|sign[ -]?up|tickets?|RSVP|报名)/i.test(sentence)) {
           const cleanUrl = trimUrl(url);
@@ -81,30 +112,31 @@ export class RuleBasedExtractor implements CandidateExtractor {
         const isDeadline =
           /(?:registration|application|submission|RSVP|tickets?|assignment|homework|problem set)/i.test(sentence)
           && /(?:closes?|deadline|due|by|extended)\b/i.test(sentence);
-        if (requested(plan, "deadline") && isDeadline && matchesRequestedAssignment(plan, sentence)) {
+        if (!communitySource && requested(plan, "deadline") && isDeadline && matchesRequestedAssignment(plan, sentence)) {
           const dateRaw = sentence.match(DATE)?.[0];
           if (dateRaw) results.push(candidate(snapshot, "deadline", sentence, sentence, authority, authorityBasis, { dateRaw, dedupeValue: dateRaw }));
         }
 
-        if (requested(plan, "event_date", "date") && !isDeadline && /(?:\bdate\s*:|\bwhen\s*:|\bevent\b|meeting|workshop|orientation|talk|lecture|hackathon|club|recital|carillon)/i.test(sentence)) {
+        if (!communitySource && requested(plan, "event_date", "date") && !isDeadline && /(?:\bdate\s*:|\bwhen\s*:|\bevent\b|meeting|workshop|orientation|talk|lecture|hackathon|club|recital|carillon)/i.test(sentence)) {
           const dateRaw = sentence.match(DATE)?.[0];
           if (dateRaw) results.push(candidate(snapshot, "event_date", sentence, sentence, authority, authorityBasis, { dateRaw, dedupeValue: dateRaw }));
         }
 
-        if (requested(plan, "event_time", "time") && /(?:\btime\s*:|\bwhen\s*:|\bdate\s*:|event|meeting|workshop)/i.test(sentence)) {
+        if (!communitySource && requested(plan, "event_time", "time") && /(?:\btime\s*:|\bwhen\s*:|\bdate\s*:|event|meeting|workshop)/i.test(sentence)) {
           const time = sentence.match(TIME)?.[0];
           if (time) results.push(candidate(snapshot, "event_time", time, sentence, authority, authorityBasis, { dedupeValue: time }));
         }
 
-        if (requested(plan, "location", "campus") && /(?:location|venue|room|building|online|zoom|campus|where\s*:|\d+\s+[A-Za-z'’.-]+(?:\s+[A-Za-z'’.-]+){0,3}\s+(?:Street|St|Road|Rd|Avenue|Ave|Circle|Lane|Ln)\b)/i.test(sentence)) {
+        if (!communitySource && requested(plan, "location", "campus") && /(?:location|venue|room|building|online|zoom|campus|where\s*:|\d+\s+[A-Za-z'’.-]+(?:\s+[A-Za-z'’.-]+){0,3}\s+(?:Street|St|Road|Rd|Avenue|Ave|Circle|Lane|Ln)\b)/i.test(sentence)) {
           results.push(candidate(snapshot, "location", sentence, sentence, authority, authorityBasis));
         }
 
-        if (requested(plan, "organizer") && /(?:organized|hosted|organizer|presented)\s+by/i.test(sentence)) {
+        if (!communitySource && requested(plan, "organizer") && /(?:organized|hosted|organizer|presented)\s+by/i.test(sentence)) {
           results.push(candidate(snapshot, "organizer", sentence, sentence, authority, authorityBasis));
         }
 
         if (
+          !communitySource &&
           requested(plan, "event_description") &&
           !descriptionAdded &&
           sentence.length >= 50 &&
@@ -116,15 +148,15 @@ export class RuleBasedExtractor implements CandidateExtractor {
           descriptionAdded = true;
         }
 
-        if (requested(plan, "submission_format") && /(?:submit|submission|upload)/i.test(sentence) && /\b(?:PDF|DOCX?|ZIP|PPTX?)\b/i.test(sentence)) {
+        if (!communitySource && requested(plan, "submission_format") && /(?:submit|submission|upload)/i.test(sentence) && /\b(?:PDF|DOCX?|ZIP|PPTX?)\b/i.test(sentence)) {
           results.push(candidate(snapshot, "submission_format", sentence, sentence, authority, authorityBasis));
         }
 
-        if (requested(plan, "requirements", "prerequisite") && /(?:\bprerequisite(?:s)?\s*:|\brequirements?\s*:|\bmust (?:have|be|bring|complete)|\brequired to\b)/i.test(sentence)) {
+        if (!communitySource && requested(plan, "requirements", "prerequisite") && /(?:\bprerequisite(?:s)?\s*:|\brequirements?\s*:|\bmust (?:have|be|bring|complete)|\brequired to\b)/i.test(sentence)) {
           results.push(candidate(snapshot, "requirements", sentence, sentence, authority, authorityBasis));
         }
 
-        if (requested(plan, "eligibility") && /(?:eligib(?:le|ility)|open to|available to|for (?:all )?students|members only)/i.test(sentence)) {
+        if (!communitySource && requested(plan, "eligibility") && /(?:eligib(?:le|ility)|open to|available to|for (?:all )?students|members only)/i.test(sentence)) {
           results.push(candidate(snapshot, "eligibility", sentence, sentence, authority, authorityBasis));
         }
 

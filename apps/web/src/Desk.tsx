@@ -1,22 +1,23 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {
-  AlarmClock, ArrowRight, ArrowUp, ArrowUpRight, BellRing, BookOpen, CalendarDays, Check, ChevronDown,
-  Eye, EyeOff, Globe, GraduationCap, History, KeyRound, LoaderCircle, Mail, MessageSquare, Monitor, Smartphone,
-  Plus, RotateCcw, Search, SlidersHorizontal, Square, Trash2, Upload, X,
+  ArrowRight, ArrowUp, ArrowUpRight, BellRing, BookOpen, CalendarDays, Check, ChevronDown,
+  Eye, EyeOff, Globe, History, KeyRound, LoaderCircle, Mail, MessageSquare, Monitor, Smartphone,
+  Plus, RotateCcw, Search, SlidersHorizontal, Square, Trash2, X,
 } from 'lucide-react';
 import {HISTORY_KEY, SETTINGS_KEY, readHistory, readPreferences, type HistoryItem, type Preferences} from './history';
 import {
   classifyQuestion, detectSearch, hostOf, isTerminal, presentationState, SOURCE_META, statusLabel, useLiveRun,
   type AnswerBundle, type Evidence, type LiveRun,
 } from './live';
-import { coverageForKind, coverageSite } from './coverage-catalog.ts';
+import { coverageSite } from './coverage-catalog.ts';
 import { SEARCH_PHASES, searchPhase, type SearchPhase } from './search-architecture.ts';
 import { VaultDrawer } from './VaultDrawer';
 import './desk.css';
 
 const starterQuestions = [
-  {label: 'Demo · DEMO101 A2 deadline update', question: 'Did the DEMO101 A2 deadline change?'},
+  {label: 'Live · CSC207 prerequisites', question: 'What are the prerequisites for CSC207H1?'},
+  {label: 'Live · CS Specialist requirements', question: 'What are the graduation requirements for the U of T Computer Science Specialist?'},
   {label: 'Live · Carillon date, place, access', question: 'When and where is the Labour Day Carillon Recital, and is it free?'},
   {label: 'Live · Carillon and Soldiers’ Tower', question: "When is the Labour Day Carillon Recital and what is the Soldiers' Tower carillon?"},
 ];
@@ -24,16 +25,37 @@ const starterQuestions = [
 const FIELD_LABEL: Record<string, string> = {
   requirements: 'Requirement',
   eligibility: 'Who it applies to',
-  deadline: 'Deadline',
   event_date: 'Date',
   event_time: 'Time',
   location: 'Location',
   organizer: 'Organizer',
   event_description: 'What it is',
-  submission_format: 'Format',
   registration_link: 'Registration',
   community_note: 'Student note',
 };
+
+const TOPIC_LABEL = {
+  course: 'Course check',
+  event: 'Event check',
+  exam: 'Exam check',
+  program: 'Program check',
+  general: 'Campus check',
+} as const;
+
+function followUpsFor(question: string): string[] {
+  switch (classifyQuestion(question)) {
+    case 'course':
+      return ['Does this apply to my record?', 'What should I check before enrolling?'];
+    case 'event':
+      return ['Do I need to register?', 'What should I know before I go?'];
+    case 'exam':
+      return ['What is my next deadline?', 'What should I do if I have a conflict?'];
+    case 'program':
+      return ['Which requirement should I check next?', 'What applies to my year of study?'];
+    default:
+      return ['What is the next official step?', 'What has not been confirmed?'];
+  }
+}
 
 interface ClaimRow {
   id: string;
@@ -48,7 +70,7 @@ function compactFacts(answer: AnswerBundle): ClaimRow[] {
   const seen = new Set<string>();
   const rows: ClaimRow[] = [];
   const rank = (field: string) =>
-    ['event_date', 'deadline', 'requirements', 'location', 'eligibility', 'event_time', 'organizer', 'event_description'].indexOf(field);
+    ['event_date', 'requirements', 'location', 'eligibility', 'event_time', 'organizer', 'event_description'].indexOf(field);
   const sorted = [...claims].sort((a, b) => {
     const left = rank(a.field);
     const right = rank(b.field);
@@ -90,6 +112,13 @@ function pageChip(url?: string): string | undefined {
 
 function clip(text: string, max = 160): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+function HighlightText({text}: {text: string}) {
+  const pattern = /(\b[A-Z]{2,4}\d{3}(?:[HY]\d)?\b|\b\d+(?:\.\d+)?\s*(?:%|credits?)\b|\b(?:UTSG|CMP1|ASIP)\b)/g;
+  const parts = text.split(pattern);
+  const isKeyword = /^(?:[A-Z]{2,4}\d{3}(?:[HY]\d)?|\d+(?:\.\d+)?\s*(?:%|credits?)|UTSG|CMP1|ASIP)$/;
+  return <>{parts.map((part, index) => isKeyword.test(part) ? <mark key={`${part}-${index}`}>{part}</mark> : part)}</>;
 }
 
 interface SitePane {
@@ -173,41 +202,15 @@ function Cite({answer, id, onCite}: {answer: AnswerBundle; id: string; onCite: (
   );
 }
 
-function DeadlineDetective({
-  answer,
-  onCite,
-}: {
-  answer: AnswerBundle;
-  onCite: (id: string) => void;
-}) {
-  const update = answer.conflicts.find((item) => item.resolution === 'explicit_update' && item.selectedClaimId);
-  if (!update || !update.selectedClaimId) return null;
-  const next = answer.claims.find((claim) => claim.id === update.selectedClaimId);
-  const previous = answer.claims.find((claim) => update.claimIds.includes(claim.id) && claim.id !== update.selectedClaimId);
-  if (!next) return null;
-  return (
-    <div className="date-update" role="status">
-      <span>
-        <small>Was</small>
-        <del>{previous ? clip(previous.text, 80) : 'Earlier deadline'}</del>
-      </span>
-      <ArrowRight size={14} />
-      <span>
-        <small>Now</small>
-        <b>{clip(next.text, 90)}</b>
-        {next.evidenceIds.slice(0, 1).map((id) => (
-          <Cite key={id} answer={answer} id={id} onCite={onCite} />
-        ))}
-      </span>
-      <small>{clip(update.explanation, 90)}</small>
-    </div>
-  );
+function sourceName(answer: AnswerBundle, evidenceId: string): string {
+  const evidence = answer.evidence.find((item) => item.id === evidenceId);
+  const source = answer.sources.find((item) => item.id === evidence?.snapshotId);
+  return (source?.sourceId && SOURCE_META[source.sourceId]?.label) ?? source?.title ?? evidence?.authority ?? 'Official source';
 }
 
 function AnswerView({
   answer,
   question,
-  runId,
   onCite,
   onFollowUp,
   citationsOpen,
@@ -216,7 +219,6 @@ function AnswerView({
 }: {
   answer: AnswerBundle;
   question: string;
-  runId: string;
   onCite: (id: string) => void;
   onFollowUp: (question: string) => void;
   citationsOpen: boolean;
@@ -225,73 +227,93 @@ function AnswerView({
 }) {
   const facts = compactFacts(answer);
   const pages = [...new Set(answer.sources.map((source) => source.url))];
-  const canExport = answer.keyDates.some((item) => item.status === 'confirmed');
-  const missingDue = classifyQuestion(question) === 'assignment' && !facts.some((fact) => fact.field === 'deadline');
-  const unknown = missingDue
-    ? 'Assignment due dates are not on the public calendar, Reddit thread, or Piazza login wall we opened.'
-    : answer.unknowns[0];
+  const gaps = answer.unknowns.slice(0, 2);
+  const kind = classifyQuestion(question);
   const lead = clip(
-    missingDue
-      ? unknown
-      : facts[0]?.text ?? answer.summary[0]?.text ?? 'Source receipts are available. Open citations for the original wording.',
+    facts[0]?.text ?? answer.summary[0]?.text ?? 'Source receipts are available. Open citations for the original wording.',
     180,
   );
   const groups = citationGroups(answer);
   const primaryEvidence = answer.evidence.find((item) => item.id === facts[0]?.evidenceIds[0]) ?? answer.evidence[0];
+  const followUps = followUpsFor(question);
   return (
     <div className="answer answer-card">
       <div className="answer-hero-head">
-        <span>Answer</span>
-        <b>{answer.mode}</b>
-        {primaryEvidence && <small>{primaryEvidence.authority} source</small>}
+        <span>{TOPIC_LABEL[kind]}</span>
+        <b className={gaps.length > 0 ? 'answer-status is-partial' : 'answer-status'}>
+          {gaps.length > 0 ? 'Partial' : 'Verified'}
+        </b>
+        <small>{answer.mode}</small>
+        {primaryEvidence && <small>{primaryEvidence.authority}</small>}
       </div>
-      <p className="answer-lead">{lead}</p>
-      {unknown && !missingDue && (
-        <p className="unknowns">Not on these pages: {clip(unknown, 140)}</p>
-      )}
-      <DeadlineDetective answer={answer} onCite={onCite} />
-      <ul className="fact-list">
-        {facts.slice(1).map((fact) => (
+      <section className="answer-summary" aria-label="Key finding">
+        <p className="answer-kicker">Key finding</p>
+        <p className="answer-lead"><HighlightText text={lead} /></p>
+        {facts[0]?.evidenceIds.slice(0, 1).map((id) => (
+          <span key={id} className="inline-source">View original wording <Cite answer={answer} id={id} onCite={onCite} /></span>
+        ))}
+      </section>
+      {facts.length > 1 && (
+        <section className="answer-section-block" aria-label="What this means">
+          <p className="answer-kicker">What this means</p>
+          <ul className="fact-list">
+            {facts.slice(1).map((fact) => (
           <li key={fact.id}>
             <b>{FIELD_LABEL[fact.field] ?? fact.field}</b>
-            <span>{clip(fact.text)}</span>
+            <span><HighlightText text={clip(fact.text)} /></span>
             {fact.evidenceIds.slice(0, 1).map((id) => (
               <Cite key={id} answer={answer} id={id} onCite={onCite} />
             ))}
           </li>
-        ))}
-      </ul>
-      {answer.keyDates[0] && facts[0]?.field !== 'event_date' && facts[0]?.field !== 'deadline' && (
+            ))}
+          </ul>
+        </section>
+      )}
+      {answer.keyDates[0] && facts[0]?.field !== 'event_date' && (
         <p className="fact-date">
           <b>{answer.keyDates[0].label}</b> {formatDateValue(answer.keyDates[0].value)}
         </p>
       )}
       {answer.communityNotes[0] && (
         <div className="community-note">
-          <span>Student note, not policy: {clip(answer.communityNotes[0].text, 160)}</span>
+          <span><b>Student perspective</b> · <HighlightText text={clip(answer.communityNotes[0].text, 160)} /></span>
           {answer.communityNotes[0].evidenceIds.slice(0, 1).map((id) => (
             <Cite key={id} answer={answer} id={id} onCite={onCite} />
           ))}
         </div>
       )}
-      {canExport && (
-        <a className="retry" href={`/api/runs/${runId}/calendar.ics`}>Download confirmed dates (.ics)</a>
+      <section className="next-steps" aria-label="Next steps">
+        <p className="answer-kicker">Next step</p>
+        <div className="follow-ups">
+          {followUps.map((question) => <button key={question} type="button" className="starter" onClick={() => onFollowUp(question)}>{question}</button>)}
+        </div>
+      </section>
+      <section className="evidence-map" aria-label="Evidence map">
+        <div className="evidence-map-head"><p className="answer-kicker">Evidence map</p><small>{pages.length} page{pages.length === 1 ? '' : 's'} checked</small></div>
+        {facts.slice(0, 4).map((fact) => {
+          const evidenceId = fact.evidenceIds[0];
+          return (
+            <button key={fact.id} type="button" className="evidence-map-row" onClick={() => evidenceId && onCite(evidenceId)}>
+              <span className="map-claim"><b>{FIELD_LABEL[fact.field] ?? 'Finding'}</b><em><HighlightText text={clip(fact.text, 78)} /></em></span>
+              <ArrowRight size={14} />
+              <span className="map-source">{evidenceId ? clip(sourceName(answer, evidenceId), 40) : 'No source'}</span>
+            </button>
+          );
+        })}
+      </section>
+      {gaps.length > 0 && (
+        <section className="answer-gaps" aria-label="Not confirmed">
+          <p className="answer-kicker">Not confirmed</p>
+          {gaps.map((gap) => <p key={gap}>{clip(gap, 160)}</p>)}
+        </section>
       )}
-      <div className="follow-ups">
-        <button type="button" className="starter" onClick={() => onFollowUp('What is the late penalty for this assignment?')}>What about the late penalty?</button>
-        <button type="button" className="starter" onClick={() => onFollowUp('What is the submission format?')}>Keep this course · submission format</button>
-      </div>
-      <p className="answer-foot">
-        <Check size={12} />
-        {pages.length} page{pages.length === 1 ? '' : 's'} · {answer.evidence.length} quote{answer.evidence.length === 1 ? '' : 's'}
-      </p>
       {groups.length > 0 && (
         <details
           className="citations-box"
           open={citationsOpen}
           onToggle={(event) => onToggleCitations((event.target as HTMLDetailsElement).open)}
         >
-          <summary>Citations · {groups.length} page{groups.length === 1 ? '' : 's'}</summary>
+          <summary>Original wording · {groups.length} source{groups.length === 1 ? '' : 's'}</summary>
           {groups.map((group) => (
             <article key={group.url} className="citation-group">
               <strong>{group.title}</strong>
@@ -357,29 +379,6 @@ function EvidenceWorkspace({run, selectedEvidenceId}: {run: LiveRun; selectedEvi
   );
 }
 
-function CoverageReceipts({answer}: {answer: AnswerBundle}) {
-  return (
-    <ul className="coverage-board coverage-receipts" aria-label="Backend coverage receipts">
-      {answer.coverage.map((receipt) => {
-        const sources = answer.sources.filter((source) => receipt.snapshotIds.includes(source.id));
-        const evidenceCount = answer.evidence.filter((item) => receipt.snapshotIds.includes(item.snapshotId)).length;
-        const latest = sources.map((source) => source.fetchedAt).sort().at(-1);
-        const mode = sources[0]?.contentMode ?? 'none';
-        return (
-          <li key={receipt.sourceId} className={`is-${receipt.status}`}>
-            <b>{SOURCE_META[receipt.sourceId]?.label ?? receipt.sourceId} · {receipt.status}</b>
-            <small>
-              {receipt.snapshotIds.length} receipt{receipt.snapshotIds.length === 1 ? '' : 's'} · {evidenceCount} contributing fact{evidenceCount === 1 ? '' : 's'} · {mode}
-              {latest ? ` · ${new Date(latest).toLocaleTimeString('en-CA', {hour: '2-digit', minute: '2-digit'})}` : ''}
-            </small>
-            {receipt.reason && <small className="receipt-reason">{receipt.reason}</small>}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
 function Workspace({onReturnToLanding}: {onReturnToLanding?: () => void} = {}) {
   const [input, setInput] = useState('');
   const [history, setHistory] = useState(readHistory);
@@ -389,7 +388,7 @@ function Workspace({onReturnToLanding}: {onReturnToLanding?: () => void} = {}) {
   const [search, setSearch] = useState('');
   const [settings, setSettings] = useState(false);
   const [about, setAbout] = useState(false);
-  const [activityOpen, setActivityOpen] = useState(true);
+  const [activityOpen, setActivityOpen] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [citationsOpen, setCitationsOpen] = useState(false);
   const [liveScroll, setLiveScroll] = useState(true);
@@ -519,7 +518,7 @@ function Workspace({onReturnToLanding}: {onReturnToLanding?: () => void} = {}) {
     setInput('');
     setExpanded(null);
     setCitationsOpen(false);
-    setActivityOpen(true);
+    setActivityOpen(false);
     setLiveScroll(true);
     setDrawer(false);
     setVaultOpen(false);
@@ -651,7 +650,7 @@ function Workspace({onReturnToLanding}: {onReturnToLanding?: () => void} = {}) {
               <div className="welcome">
                 <span className="welcome-icon"><BookOpen size={22} /></span>
                 <h1>One less thing to figure out.</h1>
-                <p>Course, exam, assignment, or event.<br />Every question first detects the sites, then splits the browser.</p>
+                <p>Course, program, exam, event, or campus service.<br />Every question first selects the right official sources, then opens them.</p>
                 {live.transportError && <p className="transport-error">{live.transportError}</p>}
                 {live.executionUnavailable && <p className="transport-error">The server is up, but live execution is not configured.</p>}
                 <div className="starters">
@@ -668,16 +667,10 @@ function Workspace({onReturnToLanding}: {onReturnToLanding?: () => void} = {}) {
                 <div className="user-question">{run.question}</div>
                 <div className="answer-label"><span className="small-logo">a.</span>AllAbout Campus</div>
                 {run.answer && (
-                  <AnswerView
-                    answer={run.answer}
-                    question={run.question}
-                    runId={run.id}
-                    onCite={cite}
-                    onFollowUp={(next) => void start(next, { parentRunId: run.id })}
-                    citationsOpen={citationsOpen}
-                    expanded={expanded}
-                    onToggleCitations={setCitationsOpen}
-                  />
+                  <div className="task-receipt">
+                    <b>Research ready</b>
+                    <span>{run.answer.sources.length} official page{run.answer.sources.length === 1 ? '' : 's'} · {run.answer.evidence.length} linked quote{run.answer.evidence.length === 1 ? '' : 's'}</span>
+                  </div>
                 )}
                 <section className={`research ${active ? 'is-running' : ''}`}>
                   <button className="section-toggle" onClick={() => setActivityOpen(!activityOpen)} aria-expanded={activityOpen}>
@@ -687,46 +680,12 @@ function Workspace({onReturnToLanding}: {onReturnToLanding?: () => void} = {}) {
                     </span>
                     <ChevronDown size={15} className={activityOpen ? 'rotated' : ''} />
                   </button>
-                  <div className="research-subline">
-                  <span>{run.mode} · {blueprint?.sourceIds.length ?? 0} {(blueprint?.sourceIds.length ?? 0) === 1 ? 'site' : 'sites'}</span>
-                    {active && <span>{archPhase}</span>}
+                  <div className="research-compact">
+                    <span className={`research-pulse ${active ? 'is-active' : ''}`} />
+                    <span>{run.mode} · {run.answer?.sources.length ?? panes.filter((pane) => pane.state === 'captured').length}/{blueprint?.sourceIds.length ?? 0} sources</span>
+                    <span className="research-metrics">{run.answer?.evidence.length ?? 0} evidence</span>
                   </div>
-                  <ol className="arch-rail" data-phase={archPhase} aria-label="Search architecture">
-                    {SEARCH_PHASES.map((step, index) => {
-                      const current = SEARCH_PHASES.findIndex((item) => item.id === archPhase);
-                      const state = index < current ? 'done' : index === current ? 'current' : 'todo';
-                      return (
-                        <li key={step.id} className={`is-${state}`}>
-                          <b>{index + 1}</b>
-                          <span>{step.label(blueprint?.sourceIds.length ?? panes.length, blueprint?.kind ?? 'general')}</span>
-                        </li>
-                      );
-                    })}
-                  </ol>
-                  {pipelineSites.length > 0 && (
-                    <div className="site-row">
-                      {pipelineSites.map((site) => (
-                        <span className="source-chip" key={site}><Globe size={10} />{site}</span>
-                      ))}
-                    </div>
-                  )}
-                  {run.answer ? (
-                    <CoverageReceipts answer={run.answer} />
-                  ) : blueprint && (
-                    <ul className="coverage-board" aria-label="Site coverage">
-                      {coverageForKind(blueprint.kind, blueprint.course).map((site) => {
-                        const opened = blueprint.sourceIds.includes(site.id);
-                        const pane = panes.find((item) => item.id === site.id);
-                        const state = !opened ? site.access : pane?.state ?? site.access;
-                        return (
-                          <li key={site.id} className={`is-${state}`}>
-                            <b>{site.label}</b>
-                            <small>{opened ? (pane?.state === 'blocked' ? site.solution : site.covers) : site.solution}</small>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
+                  {pipelineSites.length > 0 && <div className="research-sites">{pipelineSites.slice(0, 3).map((site) => <span className="source-chip" key={site}><Globe size={10} />{site}</span>)}</div>}
                   <div className="progress-track"><span style={{width: `${progress}%`}} /></div>
                   <div className={`activity-collapse ${activityOpen ? 'open' : ''}`}>
                     <div className="activity-collapse-inner">
@@ -789,7 +748,7 @@ function Workspace({onReturnToLanding}: {onReturnToLanding?: () => void} = {}) {
               <textarea
                 maxLength={2000}
                 aria-label="Ask a question"
-                placeholder="Ask a course, exam, assignment, or event…"
+                placeholder="Ask about a course, program, exam, event, or campus service…"
                 rows={1}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -814,20 +773,31 @@ function Workspace({onReturnToLanding}: {onReturnToLanding?: () => void} = {}) {
         </section>
         <section className="browser-panel">
           <div className="panel-header">
-            <span><Monitor size={16} />{run?.executionKind === 'local_fixture' ? 'Local Evidence Preview' : 'Steel Browser'}</span>
+            <span><Monitor size={16} />{run?.answer ? 'Research result' : run?.executionKind === 'local_fixture' ? 'Local Evidence Preview' : 'Steel Browser'}</span>
             <small className={`connection ${connection.online ? 'is-online' : ''}`}><i />{connection.text}</small>
           </div>
-          <div className="browser-toolbar">
+          {!run?.answer && <div className="browser-toolbar">
             <span className="browser-dots"><i /><i /><i /></span>
             <div className="address">
               <Globe size={13} />
               <span>{latestUrl ? new URL(latestUrl).host : run?.viewerUrl ? 'steel.dev live session' : 'Waiting for a task'}</span>
             </div>
             <small>{run?.mode ?? 'IDLE'}</small>
-          </div>
-          <div className={`browser-stage ${run ? 'has-live' : ''} ${run && isSteelViewerUrl(run.viewerUrl) && !run.viewerClosed ? 'is-projecting' : run ? 'is-split' : ''}`}>
+          </div>}
+          <div className={`browser-stage ${run && !run.answer ? 'has-live' : ''} ${run && isSteelViewerUrl(run.viewerUrl) && !run.viewerClosed ? 'is-projecting' : run && !run.answer ? 'is-split' : ''} ${run?.answer ? 'has-result' : ''}`}>
             {run?.answer ? (
-              <EvidenceWorkspace run={run} selectedEvidenceId={expanded} />
+              <div className="result-workspace">
+                <AnswerView
+                  answer={run.answer}
+                  question={run.question}
+                  onCite={cite}
+                  onFollowUp={(next) => void start(next, { parentRunId: run.id })}
+                  citationsOpen={citationsOpen}
+                  expanded={expanded}
+                  onToggleCitations={setCitationsOpen}
+                />
+                <EvidenceWorkspace run={run} selectedEvidenceId={expanded} />
+              </div>
             ) : run ? (
               isSteelViewerUrl(run.viewerUrl) && !run.viewerClosed ? (
                 <div className="live-frame" data-testid="steel-live-frame">
@@ -884,8 +854,8 @@ function Workspace({onReturnToLanding}: {onReturnToLanding?: () => void} = {}) {
                   <span /><span /><span />
                 </div>
                 <h2>Watch three sites at once.</h2>
-                <p>A course or assignment run opens calendar, Reddit, and Piazza in split panes. Blocked sites stay visible as a login or policy wall.</p>
-                <small>calendar · reddit · piazza</small>
+                <p>Each question opens the official pages that fit it, then keeps the evidence beside the answer.</p>
+                <small>calendar · registrar · student services</small>
               </div>
             )}
           </div>
@@ -901,10 +871,6 @@ function Workspace({onReturnToLanding}: {onReturnToLanding?: () => void} = {}) {
           </div>
         </section>
       </main>
-      <footer className="app-footer">
-        <span>ALLABOUT CAMPUS</span>
-        <span>Made for the questions between classes.</span>
-      </footer>
       {drawer && (
         <div className="drawer-backdrop" onClick={() => setDrawer(false)}>
           <aside ref={dialog} className="history-drawer" role="dialog" aria-modal="true" aria-labelledby="history-heading" onClick={(e) => e.stopPropagation()}>
@@ -961,15 +927,34 @@ function Workspace({onReturnToLanding}: {onReturnToLanding?: () => void} = {}) {
 }
 
 const setupCards = [
-  {id: 'Course desk', title: 'Course desk', copy: 'Ask clear questions and keep the original course page beside the answer.', icon: MessageSquare, tag: 'CORE'},
-  {id: 'Timetable', title: 'Timetable & class alerts', copy: 'Upload a timetable or add classes later. Get a reminder before your next class.', icon: CalendarDays, tag: 'SCHEDULE'},
-  {id: 'Assessments', title: 'Study & assessment plan', copy: 'Track exercises, midterms, tests, final exams, and assignment milestones.', icon: GraduationCap, tag: 'STUDY'},
-  {id: 'Notices', title: 'Important notices', copy: 'Flag deadline changes, room updates, and messages that need your attention.', icon: BellRing, tag: 'ALERTS'},
+  {
+    id: 'Courses & Requirements',
+    title: 'Courses & Programs',
+    copy: 'Prerequisites, offerings, and degree paths.',
+    sources: ['Academic Calendar', 'CS Department'],
+    icon: BookOpen,
+    tag: 'COURSES',
+  },
+  {
+    id: 'Campus Events',
+    title: 'Campus Events',
+    copy: 'Dates, locations, access, and registration.',
+    sources: ['U of T Events', 'Student Life'],
+    icon: CalendarDays,
+    tag: 'EVENTS',
+  },
+  {
+    id: 'Policies & Services',
+    title: 'Policy & Support',
+    copy: 'University rules and student services.',
+    sources: ['U of T Registrar', 'Current Students'],
+    icon: BellRing,
+    tag: 'POLICIES',
+  },
 ];
 
 function CampusSetup({onContinue, onLogout}: {onContinue: (features: string[]) => void; onLogout: () => void}) {
-  const [selected, setSelected] = useState<string[]>(['Course desk', 'Timetable', 'Assessments']);
-  const [file, setFile] = useState('');
+  const [selected, setSelected] = useState<string[]>(['Courses & Requirements', 'Campus Events']);
   const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   return (
     <div className="setup-shell">
@@ -978,13 +963,11 @@ function CampusSetup({onContinue, onLogout}: {onContinue: (features: string[]) =
           <span className="logo">a.</span>
           <strong>AllAbout <span>Campus</span></strong>
         </button>
-        <span>SET UP YOUR SPACE · 2 OF 2</span>
       </header>
       <main className="setup-main">
         <div className="setup-intro">
-          <span className="auth-kicker">BUILD YOUR SEMESTER</span>
-          <h1>Choose your campus tools.</h1>
-          <p>You can come back and change these anytime.</p>
+          <h1>Choose a campus topic</h1>
+          <p>Pick what you want to look up.</p>
         </div>
         <section className="setup-grid">
           {setupCards.map((card, index) => {
@@ -992,31 +975,22 @@ function CampusSetup({onContinue, onLogout}: {onContinue: (features: string[]) =
             const active = selected.includes(card.id);
             return (
               <button type="button" className={`setup-card tone-${index} ${active ? 'selected' : ''}`} key={card.id} aria-pressed={active} onClick={() => toggle(card.id)}>
-                <span className="setup-tag">{card.tag}</span>
-                <span className="setup-icon"><Icon size={22} /></span>
+                <span className="setup-card-head"><span className="setup-index">0{index + 1}</span><span className="setup-tag">{card.tag}</span></span>
+                <span className="setup-icon"><Icon size={20} /></span>
                 <strong>{card.title}</strong>
                 <p>{card.copy}</p>
+                <span className="setup-sources"><small>SOURCES</small>{card.sources.map((source) => <b key={source}>{source}</b>)}</span>
                 <span className="select-indicator">{active ? <Check size={15} /> : <Plus size={15} />}</span>
               </button>
             );
           })}
         </section>
-        <section className="timetable-upload">
-          <div>
-            <Upload size={19} />
-            <span>
-              <b>Have a timetable file?</b>
-              <small>{file ? `Ready to import: ${file}` : 'PDF, screenshot, or calendar export'}</small>
-            </span>
-          </div>
-          <label className="upload-control">
-            {file ? 'Replace file' : 'Choose file'}
-            <input type="file" accept=".pdf,image/*,.ics" onChange={(e) => setFile(e.target.files?.[0]?.name || '')} />
-          </label>
-        </section>
         <div className="setup-bottom">
-          <span><AlarmClock size={15} />Class alerts default to 20 minutes before start.</span>
-          <button className="primary-auth" onClick={() => onContinue(selected)}>Open my campus desk <ArrowRight size={17} /></button>
+          <span><b>{selected.length}</b> areas selected</span>
+          <div className="setup-actions">
+            <button className="setup-skip" onClick={() => onContinue([])}>Skip for now</button>
+            <button className="primary-auth" disabled={selected.length === 0} onClick={() => onContinue(selected)}>Continue <ArrowRight size={17} /></button>
+          </div>
         </div>
       </main>
     </div>
@@ -1103,7 +1077,7 @@ function AuthGate({forceLogin = false, onEnterDesk, onReturnToLanding}: AuthGate
         <div className="launch-orbit" />
         <div className="launch-logo">a.</div>
         <p>AllAbout <b>Campus</b></p>
-        <span>Finding your campus, one page at a time.</span>
+        <span>Opening your desk.</span>
       </div>
     );
   }
@@ -1114,16 +1088,16 @@ function AuthGate({forceLogin = false, onEnterDesk, onReturnToLanding}: AuthGate
       <aside className="auth-aside">
         <div className="auth-brand"><span className="logo">a.</span><strong>AllAbout <span>Campus</span></strong></div>
         <div className="auth-copy">
-          <span className="auth-kicker">YOUR CAMPUS, CLEARER</span>
-          <h1>Campus answers.<br />Without the hunt.</h1>
-          <p>Courses, deadlines, and sources—all in one place.</p>
+          <span className="auth-kicker">University of Toronto</span>
+          <h1>It’s all about<br />the page.</h1>
+          <p>Ask once. We keep the official source in view.</p>
         </div>
         <div className="auth-grid" aria-hidden="true"><i /><i /><i /><i /></div>
       </aside>
       <main className="auth-main">
         <div className="auth-top"><span>ALLABOUT CAMPUS</span></div>
         <section className="auth-card">
-          <h2>{isVerify ? 'Check your inbox' : isForgot ? 'Reset password' : mode === 'create' ? 'Create account' : 'Welcome back'}</h2>
+          <h2>{isVerify ? 'Check your inbox' : isForgot ? 'Reset password' : mode === 'create' ? 'Create account' : 'Welcome'}</h2>
           <p>
             {isVerify
               ? notice
@@ -1131,7 +1105,7 @@ function AuthGate({forceLogin = false, onEnterDesk, onReturnToLanding}: AuthGate
                 ? 'We’ll send you a verification code.'
                 : mode === 'create'
                   ? 'Choose email or phone to get started.'
-                  : 'Sign in to open your campus desk.'}
+                  : 'Enter your campus desk.'}
           </p>
           {isVerify ? (
             <form onSubmit={verify}>
@@ -1175,7 +1149,6 @@ function AuthGate({forceLogin = false, onEnterDesk, onReturnToLanding}: AuthGate
           )}
           {mode === 'login' && <p className="auth-foot">New here? <button onClick={() => setMode('create')}>Create an account</button></p>}
           {mode === 'create' && <p className="auth-foot">Already registered? <button onClick={() => setMode('login')}>Sign in</button></p>}
-          <small className="auth-privacy">Demo account flow · no personal data is sent</small>
         </section>
       </main>
     </div>
@@ -1183,7 +1156,7 @@ function AuthGate({forceLogin = false, onEnterDesk, onReturnToLanding}: AuthGate
 }
 
 function App() {
-  const [showLanding, setShowLanding] = useState(false);
+  const [showLanding, setShowLanding] = useState(true);
   if (showLanding) {
     return <AuthGate forceLogin onEnterDesk={() => setShowLanding(false)} onReturnToLanding={() => setShowLanding(true)} />;
   }
