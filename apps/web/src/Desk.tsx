@@ -441,6 +441,8 @@ function Workspace({institution = 'uoft', onReturnToLanding, onBackToTools}: {in
   const [storageError, setStorageError] = useState(false);
   const [clarifyText, setClarifyText] = useState('');
   const [archPhase, setArchPhase] = useState<SearchPhase>('detect');
+  const [viewerState, setViewerState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
+  const [viewerAttempt, setViewerAttempt] = useState(0);
   const feed = useRef<HTMLDivElement>(null);
   const chat = useRef<HTMLDivElement>(null);
   const dialog = useRef<HTMLElement>(null);
@@ -462,6 +464,16 @@ function Workspace({institution = 'uoft', onReturnToLanding, onBackToTools}: {in
   const active = !!run && !isTerminal(run.status);
   const connection = connectionLabel(run);
   const presentation = presentationState(run);
+
+  useEffect(() => {
+    if (!isSteelViewerUrl(run?.viewerUrl) || run?.viewerClosed) {
+      setViewerState('idle');
+      return;
+    }
+    setViewerState('loading');
+    const timeout = window.setTimeout(() => setViewerState((current) => current === 'ready' ? current : 'unavailable'), 9000);
+    return () => window.clearTimeout(timeout);
+  }, [run?.viewerUrl, run?.viewerClosed, viewerAttempt]);
 
   useEffect(() => {
     try {
@@ -860,12 +872,22 @@ function Workspace({institution = 'uoft', onReturnToLanding, onBackToTools}: {in
                     </a>
                   )}
                   <iframe
+                    key={`${run.viewerUrl}-${viewerAttempt}`}
                     src={run.viewerUrl ?? undefined}
                     title="Steel live browser"
                     sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock"
                     referrerPolicy="no-referrer"
                     tabIndex={isInteractiveSteelViewer(run.viewerUrl) ? 0 : -1}
+                    onLoad={() => setViewerState('ready')}
+                    onError={() => setViewerState('unavailable')}
                   />
+                  {viewerState === 'unavailable' && (
+                    <div className="viewer-recovery" role="status">
+                      <strong>Live view did not load.</strong>
+                      <span>The research run can continue in the background. Reload this viewer without rerunning the question.</span>
+                      <button type="button" onClick={() => setViewerAttempt((attempt) => attempt + 1)}><RotateCcw size={14} /> Reload view</button>
+                    </div>
+                  )}
                   {!isInteractiveSteelViewer(run.viewerUrl) && <div className="gather-overlay">
                     <span className="gather-kicker">LIVE STEEL SESSION</span>
                     <strong>{panes.find((pane) => pane.state === 'live')?.label ?? 'Opening the live page'}</strong>

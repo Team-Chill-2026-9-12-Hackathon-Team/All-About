@@ -5,6 +5,7 @@
   "type": "module",
   "workspaces": [
     "apps/server",
+    "apps/web",
     "packages/*"
   ],
   "scripts": {
@@ -13,6 +14,7 @@
     "dev:web": "npm --prefix apps/web run dev",
     "check:local": "node scripts/check-local.mjs",
     "demo:preflight": "node scripts/demo-preflight.mjs",
+    "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
   },

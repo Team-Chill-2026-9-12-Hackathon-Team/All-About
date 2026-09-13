@@ -18,7 +18,7 @@ export const SEARCH_PHASES: { id: SearchPhase; label: (count: number, kind: Quer
   { id: 'answer', label: () => 'Answer' },
 ];
 
-const COURSE_RE = /\b([a-z]{3})\s?-?\s?(\d{3})(h1|y1)?\b/i;
+const COURSE_RE = /\b([a-z]{2,4})\s?-?\s?(\d{3})(h1|y1)?\b/i;
 
 export function classifyQuestion(question: string): QueryKind {
   if (/(?:exam|finals?|deferred|conflict)/i.test(question)) return 'exam';
@@ -64,7 +64,7 @@ export function detectSearch(question: string, institution: Institution = 'uoft'
     else if (kind === 'housing') sourceIds.push('waterloo-housing', 'waterloo-student-life', 'reddit-waterloo');
     else if (kind === 'finance') sourceIds.push('waterloo-finance', 'waterloo-important-dates', 'waterloo-quest');
     else if (kind === 'career') sourceIds.push('waterloo-coop', 'waterloo-career', 'reddit-waterloo');
-    else if (kind === 'community') sourceIds.push('reddit-waterloo', 'uwflow', 'waterloo-calendar');
+    else if (kind === 'community') sourceIds.push('reddit-waterloo', 'uwflow', 'ratemyprofessors-waterloo');
     else if (kind === 'service') sourceIds.push('waterloo-student-life', 'waterloo-registrar', 'waterloo-policies');
     else sourceIds.push('waterloo-student-life', 'waterloo-registrar', 'waterloo-events');
     return {
@@ -102,6 +102,18 @@ export function detectSearch(question: string, institution: Institution = 'uoft'
   } else if (kind === 'program') {
     sourceIds.push('academic-calendar-degree-requirements', 'uoft-registrar', 'uoft-current-students');
     if (isComputerScienceProgram) sourceIds.splice(0, 1, 'academic-calendar-cs-specialist', 'cs-program-entry-cmp1');
+  } else if (kind === 'policy') {
+    sourceIds.push('uoft-registrar', 'academic-calendar-degree-requirements', 'uoft-current-students');
+  } else if (kind === 'housing') {
+    sourceIds.push('uoft-current-students', 'student-life-events', 'reddit-uoft');
+  } else if (kind === 'finance') {
+    sourceIds.push('uoft-registrar', 'uoft-current-students', 'academic-calendar-sessional-dates');
+  } else if (kind === 'career') {
+    sourceIds.push('uoft-current-students', 'ulife-organizations', 'reddit-uoft');
+  } else if (kind === 'community') {
+    sourceIds.push('reddit-uoft', 'ratemyprofessors-uoft', 'academic-calendar-course-search');
+  } else if (kind === 'service') {
+    sourceIds.push('uoft-current-students', 'uoft-registrar', 'ulife-organizations');
   } else if (isAcorn) {
     sourceIds.push('acorn-login');
   } else {

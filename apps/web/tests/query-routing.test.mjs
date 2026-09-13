@@ -73,7 +73,7 @@ describe('question routing', () => {
 
   it('routes general campus questions to student services rather than a CS course', () => {
     const input = buildQueryInput('Where can I find support as a current student?');
-    assert.deepEqual(input.sourceIds, ['uoft-current-students', 'uoft-registrar', 'student-life-events']);
+    assert.deepEqual(input.sourceIds, ['uoft-current-students', 'uoft-registrar', 'ulife-organizations']);
   });
 
   it('routes personal account questions to ACORN', () => {
@@ -91,7 +91,14 @@ describe('question routing', () => {
     assert.deepEqual(detectSearch('What are the prerequisites for CS 246?', 'waterloo').sourceIds,
       ['waterloo-calendar', 'waterloo-classes', 'uwflow']);
     assert.deepEqual(detectSearch('What do students say about CS 246 on Reddit?', 'waterloo').sourceIds,
-      ['reddit-waterloo', 'uwflow', 'waterloo-calendar']);
+      ['reddit-waterloo', 'uwflow', 'ratemyprofessors-waterloo']);
+  });
+
+  it('routes U of T campus topics to topic-specific primary sources', () => {
+    assert.deepEqual(detectSearch('What housing options are available?').sourceIds,
+      ['uoft-current-students', 'student-life-events', 'reddit-uoft']);
+    assert.deepEqual(detectSearch('What do students say about CSC207 on Reddit?').sourceIds,
+      ['reddit-uoft', 'ratemyprofessors-uoft', 'academic-calendar-course-search']);
   });
 
   it('sends the selected institution and campus to the backend', () => {

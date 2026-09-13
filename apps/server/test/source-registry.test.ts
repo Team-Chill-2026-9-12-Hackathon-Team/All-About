@@ -28,6 +28,7 @@ describe("live source registry", () => {
       "uoft-registrar",
       "reddit-uoft-csc207",
       "reddit-uoft",
+      "ratemyprofessors-uoft",
       "piazza-login",
       "artsci-exam-conflicts",
       "hart-house-events",
@@ -53,6 +54,7 @@ describe("live source registry", () => {
       "waterloo-career",
       "reddit-waterloo",
       "uwflow",
+      "ratemyprofessors-waterloo",
       "waterloo-quest",
     ]);
     expect(fixtures.map(({ id }) => id)).toEqual([

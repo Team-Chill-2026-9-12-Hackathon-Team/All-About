@@ -19,6 +19,7 @@ const waterlooPublicSourceRows: Array<[string, string, string, string[]]> = [
   ["waterloo-career", "Waterloo Career Development", "https://uwaterloo.ca/career-development/", ["uwaterloo.ca"]],
   ["reddit-waterloo", "Reddit r/uwaterloo", "https://www.reddit.com/r/uwaterloo/.rss", ["www.reddit.com"]],
   ["uwflow", "UW Flow", "https://uwflow.com/", ["uwflow.com"]],
+  ["ratemyprofessors-waterloo", "Rate My Professors — Waterloo", "https://www.ratemyprofessors.com/", ["www.ratemyprofessors.com", "ratemyprofessors.com"]],
 ];
 const waterlooSources: SourceConfig[] = waterlooPublicSourceRows.map(([id, label, entryUrl, allowedHosts]) => ({
   id,
@@ -245,6 +246,23 @@ const candidateSources = [
     label: "Reddit r/UofT",
     entryUrl: "https://www.reddit.com/r/UofT/.rss",
     allowedHosts: ["www.reddit.com"],
+    scope: {
+      school: "University of Toronto",
+      campus: "UTSG",
+      term: null,
+      course: null,
+      section: null,
+      entity: null,
+    },
+    contentMode: "live",
+    access: "public",
+  },
+  {
+    id: "ratemyprofessors-uoft",
+    kind: "community",
+    label: "Rate My Professors — U of T",
+    entryUrl: "https://www.ratemyprofessors.com/",
+    allowedHosts: ["www.ratemyprofessors.com", "ratemyprofessors.com"],
     scope: {
       school: "University of Toronto",
       campus: "UTSG",
