@@ -9,15 +9,22 @@ const candidate = {snapshotId:'p1',text:'Fall 2026 reading week: November 2–6,
 function client(claims: unknown[]) {return {responses:{parse:vi.fn().mockResolvedValue({output_parsed:{claims,limitations:[]}})}} as unknown as OpenAI;}
 describe('question-grounded web research', () => {
  it('discovers sources beyond the registry, including forums, without credentials',async()=>{
-  const create=vi.fn().mockResolvedValue({output:[{type:'message',content:[{type:'output_text',annotations:[{type:'url_citation',url:'https://www.reddit.com/r/UofT/comments/123',title:'Student discussion'},{type:'url_citation',url:'http://127.0.0.1/private',title:'Invalid'}]}]}]});
+  const create=vi.fn().mockResolvedValue({output:[{type:'message',content:[{type:'output_text',annotations:[{type:'url_citation',url:'https://www.reddit.com/r/UofT/comments/123',title:'Student discussion'},{type:'url_citation',url:'https://www.utsc.utoronto.ca/registrar/dates',title:'Wrong campus'},{type:'url_citation',url:'http://127.0.0.1/private',title:'Invalid'}]}]}]});
   const result=await createWebResearchPlanner({responses:{create}} as unknown as OpenAI,'test')('test',plan.input,[],new AbortController().signal);
   expect('targets' in result && result.targets).toMatchObject([{kind:'community',access:'public',allowedHosts:['www.reddit.com']}]);
+  expect('targets' in result && result.targets).toHaveLength(1);
   expect(create.mock.calls[0]![0].tools).toEqual([{type:'web_search'}]);
  });
  it.each(['http://example.com','https://127.0.0.1','https://localhost','https://secret:pass@example.com','https://host.internal','https://[::1]'])('rejects unsafe discovered URL %s',url=>expect(publicSearchUrl(url)).toBeNull());
  it('keeps directly relevant verbatim evidence',async()=>{
-  const answer=await createSemanticAnswer(client([candidate]),'test')(plan,{pages:[page],failures:[],cleanup:'released'},new AbortController().signal);
+  const answer=await createSemanticAnswer(client([{...candidate,text:'Reading week runs in early November.'}]),'test')(plan,{pages:[page],failures:[],cleanup:'released'},new AbortController().signal);
   expect(answer.summary[0]?.text).toContain('November 2');expect(answer.unknowns).toEqual([]);
+  expect(answer.claims[0]?.text).toBe(candidate.quote);
+ });
+ it('deterministically excludes a different academic term even if the model accepts it',async()=>{
+  const winter={...candidate,text:'Winter Reading Week.',quote:'February 15-19, 2027 Winter Reading Week - no classes'};
+  const answer=await createSemanticAnswer(client([candidate,winter]),'test')(plan,{pages:[{...page,text:`${page.text}\n${winter.quote}`}],failures:[],cleanup:'released'},new AbortController().signal);
+  expect(answer.summary.map(item=>item.text)).toEqual([candidate.quote]);
  });
  it.each([
   {...candidate,directlyAnswersQuestion:false,text:'Prerequisite: MAT135.',quote:'Prerequisite: MAT135.'},
