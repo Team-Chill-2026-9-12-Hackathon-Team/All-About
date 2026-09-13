@@ -1166,12 +1166,15 @@ function AuthGate({forceLogin = false, onEnterDesk, onReturnToLanding}: AuthGate
   }
   const isVerify = mode === 'verify';
   const isForgot = mode === 'forgot';
+  const schoolName = institution === 'waterloo' ? 'University of Waterloo' : 'University of Toronto';
+  const schoolShortName = institution === 'waterloo' ? 'Waterloo' : 'U of T';
+  const emailPlaceholder = institution === 'waterloo' ? 'you@uwaterloo.ca' : 'you@utoronto.ca';
   return (
     <div className="auth-shell">
       <aside className="auth-aside">
         <div className="auth-brand"><span className="logo">a.</span><strong>AllAbout <span>Campus</span></strong></div>
         <div className="auth-copy">
-          <span className="auth-kicker">University of Toronto</span>
+          <span className="auth-kicker">{schoolName}</span>
           <h1>It’s all about<br />the page.</h1>
           <p>Ask once. We keep the official source in view.</p>
         </div>
@@ -1192,7 +1195,7 @@ function AuthGate({forceLogin = false, onEnterDesk, onReturnToLanding}: AuthGate
                 ? 'We’ll send you a verification code.'
                 : mode === 'create'
                   ? 'Choose email or phone to get started.'
-                  : `Enter your ${institution === 'waterloo' ? 'Waterloo' : 'U of T'} campus desk.`}
+                  : `Enter your ${schoolShortName} research desk.`}
           </p>
           {isVerify ? (
             <form onSubmit={verify}>
@@ -1209,8 +1212,8 @@ function AuthGate({forceLogin = false, onEnterDesk, onReturnToLanding}: AuthGate
                 </div>
               )}
               <label>
-                {isForgot ? 'Email or phone' : mode === 'create' ? (method === 'email' ? 'Email address' : 'Phone number') : 'Username or email'}
-                <input required type={method === 'email' || mode === 'login' ? 'email' : 'tel'} autoComplete="username" placeholder={method === 'phone' ? '+1 416 555 0123' : 'you@utoronto.ca'} />
+                {isForgot ? 'Email or phone' : mode === 'create' ? (method === 'email' ? 'Email address' : 'Phone number') : `${schoolShortName} email or username`}
+                <input required type={method === 'email' || mode === 'login' ? 'email' : 'tel'} autoComplete="username" placeholder={method === 'phone' ? '+1 416 555 0123' : emailPlaceholder} />
               </label>
               {!isForgot && (
                 <label>
