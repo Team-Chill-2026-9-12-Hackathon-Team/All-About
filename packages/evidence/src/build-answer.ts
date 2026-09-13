@@ -8,7 +8,7 @@ import type { AnswerBlock, AnswerBundle, BrowserBatch, Claim, Evidence, QueryPla
 const SUMMARY_FIELDS = new Set([
   "deadline", "eligibility", "event_date", "event_description", "event_name",
   "event_time", "location", "organizer", "registration_link",
-  "syllabus",
+  "syllabus", "answer",
 ]);
 const REQUIREMENT_FIELDS = new Set(["requirements", "submission_format"]);
 const FIELD_ALIASES: Record<string, string> = {

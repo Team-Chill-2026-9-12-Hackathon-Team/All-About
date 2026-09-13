@@ -1,4 +1,5 @@
 import Steel from 'steel-sdk';
+import { readCanvasFile } from './canvas-file.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
@@ -489,7 +490,7 @@ async function collectTarget(
 
   countStep();
   emit({ type: 'step', sourceId: target.id, action: 'read_visible_text', url: capturedUrl.href });
-  const read = await readVisibleText(page);
+  const read = (target.id === 'quercus-login' ? await readCanvasFile(page) : null) ?? await readVisibleText(page);
   if (read.text.length < MIN_TEXT_LENGTH) {
     throw new BrowserTargetError('NO_MATCH', 'The page did not expose enough visible text to use.', true);
   }

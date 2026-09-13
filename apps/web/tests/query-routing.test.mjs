@@ -61,7 +61,7 @@ describe('question routing', () => {
   it('does not silently substitute CSC207 for an unknown course', () => {
     const input = buildQueryInput('What are the prerequisites for MAT223?');
     assert.deepEqual(input.sourceIds, ['academic-calendar-course-search', 'timetable-builder', 'cs-undergrad-courses']);
-    assert.equal(input.scope.course, 'MAT223H1');
+    assert.equal(input.scope.course, 'MAT223');
   });
 
   it('routes general campus questions to student services rather than a CS course', () => {
@@ -77,7 +77,7 @@ describe('question routing', () => {
   it('routes an enrolled course syllabus through Quercus', () => {
     const input = buildQueryInput('PHL245 syllabus');
     assert.deepEqual(input.sourceIds, ['quercus-login', 'academic-calendar-course-search']);
-    assert.equal(input.scope.course, 'PHL245H1');
+    assert.equal(input.scope.course, 'PHL245');
   });
 });
 

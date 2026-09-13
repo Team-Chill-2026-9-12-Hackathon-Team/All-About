@@ -1,3 +1,5 @@
+import OpenAI from "openai";
+import { createWebResearchPlanner, createSemanticAnswer } from "./web-research.js";
 import { collectPages as collectWithSteel, type CredentialResolver } from "@allabout/browser";
 import type {
   BrowserBatch,
@@ -35,6 +37,8 @@ export function createRunRuntime(options: RuntimeOptions): RunRuntime {
   if (options.sources.length === 0) {
     throw new Error("At least one source is required to configure run execution.");
   }
+  const client = options.apiKey && options.model ? new OpenAI({ apiKey: options.apiKey }) : null;
+  const semanticAnswer = client ? createSemanticAnswer(client, options.model!) : null;
   const planRun = options.planRun ?? createConfiguredOpenAiPlanner(options);
   const runStore = options.runStore ?? new RunStore();
   const collectPages =
@@ -49,7 +53,9 @@ export function createRunRuntime(options: RuntimeOptions): RunRuntime {
       sources: options.sources,
       planRun,
       collectPages,
-      buildAnswer: options.buildAnswer ?? buildWithEvidence,
+      buildAnswer: options.buildAnswer ?? ((plan, batch, signal) =>
+        plan.input.mode === "LIVE_WEB" && semanticAnswer
+          ? semanticAnswer(plan, batch, signal) : buildWithEvidence(plan, batch, signal)),
     }),
   };
 }
@@ -83,10 +89,17 @@ export function createFixtureAwareCollector(
 
 function createConfiguredOpenAiPlanner(options: RuntimeOptions): RunPlanner {
   if (options.apiKey === undefined || options.model === undefined) {
-    return (runId, input, sources) => createDefaultPlan(runId, input, sources);
+    return (runId, input, sources) => {
+      if (input.mode === "LIVE_WEB") throw new Error("Live research requires a configured OpenAI API key and model.");
+      return createDefaultPlan(runId, input, sources);
+    };
   }
+  const discover = createWebResearchPlanner(new OpenAI({ apiKey: options.apiKey }), options.model);
   const openai = createOpenAiRunPlanner({ apiKey: options.apiKey, model: options.model });
   return async (runId, input, sources, signal) => {
+    if (input.mode === "LIVE_WEB" && !input.sourceIds?.some(id => sources.some(s => s.id === id && s.access === "authorized"))) {
+      return discover(runId, input, sources, signal);
+    }
     if (input.sourceIds !== undefined && input.sourceIds.length > 0) {
       return createDefaultPlan(runId, input, sources);
     }

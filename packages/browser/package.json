@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "@allabout/contracts": "*",
+    "pdfjs-dist": "^6.3.289",
     "playwright": "1.63.0",
     "steel-sdk": "0.18.0"
   },

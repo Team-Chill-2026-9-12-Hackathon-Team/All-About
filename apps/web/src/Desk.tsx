@@ -247,9 +247,9 @@ function AnswerView({
     facts[0]?.text ?? answer.summary[0]?.text ?? (
       /syllabus|course outline/i.test(question)
         ? 'The syllabus text was not available. Open the original Quercus course page below to inspect it directly.'
-        : 'Source receipts are available. Open the original pages below.'
+        : 'No directly relevant answer was confirmed. Check the limitations and original sources below.'
     ),
-    180,
+    450,
   );
   const groups = citationGroups(answer);
   const primaryEvidence = answer.evidence.find((item) => item.id === facts[0]?.evidenceIds[0]) ?? answer.evidence[0];
@@ -259,7 +259,7 @@ function AnswerView({
       <div className="answer-hero-head">
         <span>{TOPIC_LABEL[kind]}</span>
         <b className={gaps.length > 0 ? 'answer-status is-partial' : 'answer-status'}>
-          {gaps.length > 0 ? 'Partial' : 'Verified'}
+          {gaps.length > 0 ? 'Partial' : 'Source-backed'}
         </b>
         <small>{answer.mode}</small>
         {primaryEvidence && <small>{primaryEvidence.authority}</small>}
@@ -707,7 +707,7 @@ function Workspace({onReturnToLanding, onBackToTools}: {onReturnToLanding?: () =
                 {run.answer && (
                   <div className="task-receipt">
                     <b>Research ready</b>
-                    <span>{run.answer.sources.length} official page{run.answer.sources.length === 1 ? '' : 's'} · {run.answer.evidence.length} linked quote{run.answer.evidence.length === 1 ? '' : 's'}</span>
+                    <span>{run.answer.sources.length} source page{run.answer.sources.length === 1 ? '' : 's'} · {run.answer.evidence.length} linked quote{run.answer.evidence.length === 1 ? '' : 's'}</span>
                   </div>
                 )}
                 <section className={`research ${active ? 'is-running' : ''}`}>
@@ -900,7 +900,7 @@ function Workspace({onReturnToLanding, onBackToTools}: {onReturnToLanding?: () =
                   <span /><span /><span />
                 </div>
                 <h2>Watch three sites at once.</h2>
-                <p>Each question opens the official pages that fit it, then keeps the evidence beside the answer.</p>
+                <p>Each question searches relevant web pages and community discussions, then keeps the evidence beside the answer.</p>
                 <small>calendar · registrar · student services</small>
               </div>
             )}

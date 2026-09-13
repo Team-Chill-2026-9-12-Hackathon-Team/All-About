@@ -20,6 +20,12 @@ Built by Team Chill for the Battle of Schools Hackathon.
 - **History** — reopen prior questions from this browser (does not start a new Steel session).
 - **Steel keychain** — save portal usernames/passwords; they are encrypted on the server and used only for exact login hosts.
 
+## Research and answer accuracy
+
+Public questions use OpenAI web search to discover up to three relevant pages across the web, including community forums, before Steel reads their content. Private course materials still use the configured Quercus/ACORN adapters. Live answers are extracted against the original question, course and term, and every accepted quote must exist in the captured text. Community reports are labeled separately from university evidence. A source-backed answer is not a guarantee that every detail is correct; missing or ambiguous evidence is reported explicitly.
+
+Live research requires an OpenAI model with web search support, API credit, and Steel access. API failures stop the run instead of silently substituting a fixed keyword answer. Labeled fixture demos remain deterministic and do not represent live research. Quercus PDF syllabi are read from the authenticated file download; scanned PDFs without a text layer still require OCR.
+
 ## Product flow
 
 ```text
