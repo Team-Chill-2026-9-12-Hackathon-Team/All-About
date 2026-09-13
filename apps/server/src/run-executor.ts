@@ -63,7 +63,7 @@ export class RunExecutor {
     this.#buildAnswer = dependencies.buildAnswer;
     this.#planRun = dependencies.planRun ?? ((runId, input, sources) =>
       createDefaultPlan(runId, input, sources));
-    this.#timeoutMs = dependencies.timeoutMs ?? 90_000;
+    this.#timeoutMs = dependencies.timeoutMs ?? 270_000;
     this.#clarificationTimeoutMs = dependencies.clarificationTimeoutMs ?? 300_000;
   }
 
@@ -197,9 +197,10 @@ export class RunExecutor {
     if (!this.#isWritable(runId)) return;
     switch (signal.type) {
       case "session_ready":
+        const interactive = new URL(signal.viewerUrl).searchParams.get("interactive") === "true";
         this.#runStore.appendEvent(runId, "viewer_ready", {
           viewerUrl: signal.viewerUrl,
-          interactive: false,
+          interactive,
         });
         break;
       case "step":
@@ -320,7 +321,7 @@ export function browserPlanBudget(targets: SourceConfig[]): QueryPlan["budget"] 
   return {
     maxPages: 3,
     maxSteps: needsLogin ? 12 : 8,
-    timeoutMs: 90_000,
+    timeoutMs: needsLogin ? 240_000 : 90_000,
   };
 }
 

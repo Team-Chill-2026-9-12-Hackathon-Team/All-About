@@ -28,7 +28,9 @@ const USERNAME_SELECTOR = [
   'input[name*="email" i]',
 ].map((selector) => `${selector}:visible`).join(", ");
 
-const CONTENT_WAIT_ATTEMPTS = 240;
+// Campus MFA is completed by the user in the live Steel viewer. Keep the
+// browser attached long enough to read the Duo code and approve the request.
+const CONTENT_WAIT_ATTEMPTS = 720;
 
 export async function attemptCredentialLogin(
   page: Page,

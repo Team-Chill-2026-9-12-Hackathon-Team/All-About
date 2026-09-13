@@ -113,7 +113,7 @@ describe("materializePlannerDecision", () => {
       { ...planDecision, sourceIds: ["quercus-login"] },
     );
     if (!("budget" in plan)) throw new Error("expected a query plan");
-    expect(plan.budget).toEqual({ maxPages: 3, maxSteps: 12, timeoutMs: 90_000 });
+    expect(plan.budget).toEqual({ maxPages: 3, maxSteps: 12, timeoutMs: 240_000 });
   });
 
   it("treats UTSG and St. George (UTSG) as the same campus", () => {

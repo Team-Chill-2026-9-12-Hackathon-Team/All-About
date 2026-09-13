@@ -2,7 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {
   ArrowRight, ArrowUp, ArrowUpRight, BellRing, BookOpen, CalendarDays, Check, ChevronDown,
-  Eye, EyeOff, Globe, History, KeyRound, LoaderCircle, Mail, MessageSquare, Monitor, Smartphone,
+  ExternalLink, Eye, EyeOff, Globe, History, KeyRound, LoaderCircle, Mail, MessageSquare, Monitor, Smartphone,
   LayoutGrid, Plus, RotateCcw, Search, SlidersHorizontal, Square, Trash2, X,
 } from 'lucide-react';
 import {HISTORY_KEY, SETTINGS_KEY, readHistory, readPreferences, type HistoryItem, type Preferences} from './history';
@@ -815,10 +815,15 @@ function Workspace({onReturnToLanding, onBackToTools}: {onReturnToLanding?: () =
             ) : run ? (
               isSteelViewerUrl(run.viewerUrl) && !run.viewerClosed ? (
                 <div className={`live-frame ${isInteractiveSteelViewer(run.viewerUrl) ? 'is-interactive' : ''}`} data-testid="steel-live-frame">
+                  {isInteractiveSteelViewer(run.viewerUrl) && (
+                    <a className="open-steel-viewer" href={run.viewerUrl ?? undefined} target="_blank" rel="noreferrer">
+                      <ExternalLink size={14} /> Open Duo sign-in
+                    </a>
+                  )}
                   <iframe
                     src={run.viewerUrl ?? undefined}
                     title="Steel live browser"
-                    sandbox="allow-scripts allow-same-origin allow-forms"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock"
                     referrerPolicy="no-referrer"
                     tabIndex={isInteractiveSteelViewer(run.viewerUrl) ? 0 : -1}
                   />

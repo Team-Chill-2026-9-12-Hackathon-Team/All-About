@@ -337,8 +337,10 @@ async function createSessionWithRetry(
   for (let attempt = 0; attempt < 2; attempt += 1) {
     throwIfAborted(signal);
     try {
+      const interactive = plan.targets.some((target) => target.access === 'authorized');
       return await client.sessions.create({
         timeout: Math.min(Math.max(plan.budget.timeoutMs, 30_000), MAX_SESSION_MS),
+        debugConfig: { interactive, systemCursor: interactive },
       });
     } catch (error) {
       lastError = error;
