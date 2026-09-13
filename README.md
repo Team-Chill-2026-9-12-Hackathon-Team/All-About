@@ -38,7 +38,7 @@ Course Desk
 - Steel SDK + Playwright (`packages/browser`)
 - Evidence extraction (`packages/evidence`)
 - Shared Zod contracts (`packages/contracts`)
-- OpenAI planner (`gpt-5-mini` when configured)
+- OpenAI web-search planner and grounded answer extraction (`gpt-4.1-mini` by default)
 
 ## Run locally
 

@@ -1,10 +1,17 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildQueryInput, classifyQuestion, pagesFromAnswer } from '../src/live.ts';
+import { buildQueryInput, classifyQuestion, currentAcademicTerm, pagesFromAnswer } from '../src/live.ts';
 import { COVERAGE_CATALOG, coverageForKind } from '../src/coverage-catalog.ts';
 import { detectSearch, searchPhase } from '../src/search-architecture.ts';
 
 describe('question routing', () => {
+  it('sends the current academic term with live questions', () => {
+    assert.equal(currentAcademicTerm(new Date('2026-09-13T12:00:00Z')), 'Fall 2026');
+    assert.equal(currentAcademicTerm(new Date('2027-02-13T12:00:00Z')), 'Winter 2027');
+    assert.equal(currentAcademicTerm(new Date('2027-06-13T12:00:00Z')), 'Summer 2027');
+    assert.equal(buildQueryInput('reading week').scope.term, currentAcademicTerm());
+  });
+
   it('sends two calendars for a CSC207 course question', () => {
     assert.equal(classifyQuestion('What are the prerequisites for CSC207H1?'), 'course');
     const input = buildQueryInput('What are the prerequisites for CSC207H1?');

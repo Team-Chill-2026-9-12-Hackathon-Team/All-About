@@ -190,6 +190,14 @@ export function eventStreamHeaders(runId: string, lastSeq: number): Record<strin
 
 const COURSE_RE = /\b([a-z]{3})\s?-?\s?(\d{3})(h1|y1)?\b/i;
 
+export function currentAcademicTerm(now = new Date()): string {
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  if (month >= 8) return `Fall ${year}`;
+  if (month <= 3) return `Winter ${year}`;
+  return `Summer ${year}`;
+}
+
 export function buildQueryInput(question: string, parentRunId?: string) {
   const plan = detectSearch(question);
   const fixture = plan.sourceIds.some((id) => id.startsWith('demo101-'));
@@ -198,7 +206,7 @@ export function buildQueryInput(question: string, parentRunId?: string) {
     scope: {
       school: 'University of Toronto',
       campus: 'UTSG',
-      term: fixture ? 'Fall 2026' : null as string | null,
+      term: fixture ? 'Fall 2026' : currentAcademicTerm(),
       course: plan.course,
       section: null as string | null,
       entity: plan.entity,
