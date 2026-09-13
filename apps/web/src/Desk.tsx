@@ -43,6 +43,9 @@ const TOPIC_LABEL = {
 } as const;
 
 function followUpsFor(question: string): string[] {
+  if (/syllabus|course outline/i.test(question)) {
+    return ['Open the course page', 'Where else could the syllabus be posted?'];
+  }
   switch (classifyQuestion(question)) {
     case 'course':
       return ['Does this apply to my record?', 'What should I check before enrolling?'];
@@ -239,7 +242,11 @@ function AnswerView({
   const gaps = answer.unknowns.slice(0, 2);
   const kind = classifyQuestion(question);
   const lead = clip(
-    facts[0]?.text ?? answer.summary[0]?.text ?? 'Source receipts are available. Open citations for the original wording.',
+    facts[0]?.text ?? answer.summary[0]?.text ?? (
+      /syllabus|course outline/i.test(question)
+        ? 'The syllabus text was not available. Open the original Quercus course page below to inspect it directly.'
+        : 'Source receipts are available. Open the original pages below.'
+    ),
     180,
   );
   const groups = citationGroups(answer);
@@ -366,11 +373,21 @@ function EvidenceWorkspace({run, selectedEvidenceId}: {run: LiveRun; selectedEvi
   const source = answer.sources.find((item) => item.id === selectedEvidence?.snapshotId) ?? answer.sources[0];
   if (!source) return null;
   const quotes = answer.evidence.filter((item) => item.snapshotId === source.id).slice(0, 4);
+  const activityPages = run.activities
+    .filter((item) => item.url && (item.title === 'Opening your enrolled course' || item.title === 'Opening the course syllabus'))
+    .map((item) => item.url as string);
+  const originalPages = [...new Set([source.url, ...activityPages])];
   return (
     <article className="evidence-workspace" aria-label="Evidence workspace">
       <div className="evidence-kicker"><span>Evidence receipt</span><b>{source.contentMode}</b></div>
       <h2>{source.title}</h2>
-      <a href={source.url} target="_blank" rel="noreferrer">{source.url}</a>
+      <div className="original-page-actions">
+        {originalPages.map((url, index) => (
+          <a key={url} href={url} target="_blank" rel="noreferrer">
+            <ExternalLink size={15} /> {index === 0 ? 'Open original page' : 'Open Quercus course'}
+          </a>
+        ))}
+      </div>
       <dl>
         <div><dt>Captured</dt><dd>{new Date(source.fetchedAt).toLocaleString('en-CA')}</dd></div>
         <div><dt>Source type</dt><dd>{source.kind}</dd></div>
