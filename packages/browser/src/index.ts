@@ -552,6 +552,19 @@ async function openMatchingQuercusContent(
   await navigateWithinSource(page, courseUrl.href, target, signal, emit, countStep, 'open_course');
   if (!/syllabus/i.test(plan.input.query)) return;
 
+  // Many Canvas courses use a custom home-page card instead of the built-in
+  // Syllabus field. Prefer that explicit course link and avoid similarly named
+  // items such as "Syllabus Quiz".
+  const homeLinks = await readLinks(page, target.allowedHosts);
+  const homeSyllabus = homeLinks
+    .filter((link) => !/quiz/i.test(link.text))
+    .sort((left, right) => Number(/course syllabus/i.test(right.text)) - Number(/course syllabus/i.test(left.text)))
+    .find((link) => /syllabus|course outline/i.test(link.text));
+  if (homeSyllabus) {
+    await navigateWithinSource(page, homeSyllabus.url, target, signal, emit, countStep, 'open_syllabus');
+    return;
+  }
+
   const syllabus = await page.evaluate(async (courseId) => {
     const response = await fetch(`/api/v1/courses/${courseId}?include[]=syllabus_body`);
     if (!response.ok) return null;
