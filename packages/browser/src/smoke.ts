@@ -15,7 +15,6 @@ const targets = eventsMode ? [
   ['csc148', 'https://artsci.calendar.utoronto.ca/course/csc148h1'],
   ['academic-dates', 'https://www.artsci.utoronto.ca/current/dates-deadlines/academic-dates'],
   ['studentlife', 'https://www.studentlife.utoronto.ca/events/'],
-  ['timetable', 'https://ttb.utoronto.ca/'],
 ] as const;
 const out = new URL('../artifacts/', import.meta.url);
 await mkdir(out, { recursive: true, mode: 0o700 });
