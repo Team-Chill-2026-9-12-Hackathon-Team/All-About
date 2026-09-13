@@ -1,4 +1,6 @@
 import Steel from 'steel-sdk';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { BrowserBatchSchema, QueryPlanSchema } from '@allabout/contracts';
 import { fallbackUrlFor, shouldUseFallback } from './fallbacks.js';
@@ -334,20 +336,44 @@ async function createSessionWithRetry(
   signal: AbortSignal,
 ) {
   let lastError: unknown;
+  const interactive = plan.targets.some((target) => target.access === 'authorized');
+  const profilePath = resolve(process.env.STEEL_PROFILE_ID_PATH?.trim() || '.data/steel-profile-id');
+  let profileId = interactive ? await readProfileId(profilePath) : null;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     throwIfAborted(signal);
     try {
-      const interactive = plan.targets.some((target) => target.access === 'authorized');
-      return await client.sessions.create({
+      const session = await client.sessions.create({
         timeout: Math.min(Math.max(plan.budget.timeoutMs, 30_000), MAX_SESSION_MS),
         debugConfig: { interactive, systemCursor: interactive },
+        ...(interactive ? { persistProfile: true } : {}),
+        ...(profileId ? { profileId } : {}),
       });
+      if (interactive && session.profileId) await saveProfileId(profilePath, session.profileId);
+      return session;
     } catch (error) {
       lastError = error;
+      // A failed or deleted Steel profile must not permanently block sign-in.
+      if (profileId) {
+        profileId = null;
+        await writeFile(profilePath, '').catch(() => undefined);
+      }
       if (attempt === 0) await holdForViewer(1_000, signal);
     }
   }
   throw lastError;
+}
+
+async function readProfileId(path: string): Promise<string | null> {
+  try {
+    return (await readFile(path, 'utf8')).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveProfileId(path: string, profileId: string): Promise<void> {
+  await mkdir(dirname(path), {recursive: true, mode: 0o700});
+  await writeFile(path, `${profileId}\n`, {mode: 0o600});
 }
 
 async function collectTarget(
@@ -497,21 +523,23 @@ async function openMatchingQuercusContent(
   if (!course) return;
 
   const courseNeedle = normalizeLinkMatch(course);
-  const courseLinks = await readLinks(page, target.allowedHosts);
-  const courseLink = courseLinks.find((link) =>
-    normalizeLinkMatch(`${link.text} ${link.url}`).includes(courseNeedle),
+  const canvasCourses = await page.evaluate(async () => {
+    const response = await fetch('/api/v1/courses?enrollment_state=active&per_page=100');
+    if (!response.ok) return [];
+    return await response.json() as Array<{id: number; name?: string; course_code?: string}>;
+  }).catch(() => [] as Array<{id: number; name?: string; course_code?: string}>);
+  const canvasCourse = canvasCourses.find((candidate) =>
+    normalizeLinkMatch(`${candidate.course_code ?? ''} ${candidate.name ?? ''}`).includes(courseNeedle),
   );
-  if (!courseLink) return;
+  if (!canvasCourse) {
+    throw new BrowserTargetError('NO_MATCH', `The signed-in Quercus account does not show ${course}.`, false);
+  }
 
-  await navigateWithinSource(page, courseLink.url, target, signal, emit, countStep, 'open_course');
+  const courseUrl = new URL(`/courses/${canvasCourse.id}`, 'https://q.utoronto.ca/');
+  await navigateWithinSource(page, courseUrl.href, target, signal, emit, countStep, 'open_course');
   if (!/syllabus/i.test(plan.input.query)) return;
-
-  const syllabusLinks = await readLinks(page, target.allowedHosts);
-  const syllabusLink = syllabusLinks.find((link) =>
-    /syllabus/i.test(`${link.text} ${link.url}`),
-  );
-  if (!syllabusLink) return;
-  await navigateWithinSource(page, syllabusLink.url, target, signal, emit, countStep, 'open_syllabus');
+  const syllabusUrl = new URL(`/courses/${canvasCourse.id}/assignments/syllabus`, 'https://q.utoronto.ca/');
+  await navigateWithinSource(page, syllabusUrl.href, target, signal, emit, countStep, 'open_syllabus');
 }
 
 async function navigateWithinSource(
