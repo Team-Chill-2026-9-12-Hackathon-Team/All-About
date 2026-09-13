@@ -86,14 +86,6 @@ export const COVERAGE_CATALOG: CoverageSite[] = [
     solution: 'Use the Registrar for institution-wide academic policy.',
   },
   {
-    id: 'timetable-builder',
-    label: 'Timetable Builder',
-    url: 'https://ttb.utoronto.ca/',
-    access: 'readable',
-    covers: 'Public offering search',
-    solution: 'Read the public landing only. We do not submit a signed-in course search.',
-  },
-  {
     id: 'academic-calendar-sessional-dates',
     label: 'Sessional dates',
     url: 'https://artsci.calendar.utoronto.ca/sessional-dates',
@@ -247,7 +239,6 @@ const BY_KIND: Record<QueryKind, string[]> = {
   course: [
     'academic-calendar-csc207',
     'cs-undergrad-courses',
-    'timetable-builder',
     'reddit-uoft-csc207',
     'ratemyprofessors-uoft',
     'quercus-login',

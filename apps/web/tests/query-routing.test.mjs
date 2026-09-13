@@ -18,7 +18,6 @@ describe('question routing', () => {
     assert.deepEqual(input.sourceIds, [
       'academic-calendar-csc207',
       'cs-undergrad-courses',
-      'timetable-builder',
     ]);
     assert.equal(input.scope.course, 'CSC207H1');
   });
@@ -67,7 +66,7 @@ describe('question routing', () => {
 
   it('does not silently substitute CSC207 for an unknown course', () => {
     const input = buildQueryInput('What are the prerequisites for MAT223?');
-    assert.deepEqual(input.sourceIds, ['academic-calendar-course-search', 'timetable-builder', 'cs-undergrad-courses']);
+    assert.deepEqual(input.sourceIds, ['academic-calendar-course-search', 'cs-undergrad-courses']);
     assert.equal(input.scope.course, 'MAT223');
   });
 
@@ -111,7 +110,7 @@ describe('question routing', () => {
 describe('fixed search architecture', () => {
   it('detects sites before a split for every question kind', () => {
     const cases = [
-      ['What are the prerequisites for CSC207H1?', 3],
+      ['What are the prerequisites for CSC207H1?', 2],
       ['When is the Labour Day Carillon Recital?', 2],
       ['When is the Arts & Science December 2026 exam period?', 3],
       ['What are the graduation requirements for the Computer Science Specialist?', 3],
@@ -142,7 +141,7 @@ describe('fixed search architecture', () => {
       assert.ok(site.solution.length > 20);
     }
     assert.equal(coverageForKind('program').some((site) => site.id === 'academic-calendar-cs-specialist'), true);
-    assert.equal(coverageForKind('course').some((site) => site.id === 'timetable-builder'), true);
+    assert.equal(coverageForKind('course').some((site) => site.id === 'timetable-builder'), false);
     assert.equal(coverageForKind('event').some((site) => site.id === 'hart-house-events'), true);
   });
 });

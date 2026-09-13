@@ -361,23 +361,6 @@ const candidateSources = [
     access: "public",
   },
   {
-    id: "timetable-builder",
-    kind: "official",
-    label: "Timetable Builder",
-    entryUrl: "https://ttb.utoronto.ca/",
-    allowedHosts: ["ttb.utoronto.ca"],
-    scope: {
-      school: "University of Toronto",
-      campus: "UTSG",
-      term: null,
-      course: null,
-      section: null,
-      entity: null,
-    },
-    contentMode: "live",
-    access: "public",
-  },
-  {
     id: "the-varsity-about",
     kind: "community",
     label: "The Varsity",

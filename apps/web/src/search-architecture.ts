@@ -93,11 +93,11 @@ export function detectSearch(question: string, institution: Institution = 'uoft'
     if (needsQuercus) {
       sourceIds.push('quercus-login', 'academic-calendar-course-search');
     } else if (isCsc207 || course === 'CSC207H1') {
-      sourceIds.push('academic-calendar-csc207', 'cs-undergrad-courses', 'timetable-builder');
+      sourceIds.push('academic-calendar-csc207', 'cs-undergrad-courses');
     } else if (isCsc148 || course === 'CSC148H1') {
-      sourceIds.push('academic-calendar-csc148', 'cs-undergrad-courses', 'timetable-builder');
+      sourceIds.push('academic-calendar-csc148', 'cs-undergrad-courses');
     } else {
-      sourceIds.push('academic-calendar-course-search', 'timetable-builder', 'cs-undergrad-courses');
+      sourceIds.push('academic-calendar-course-search', 'cs-undergrad-courses');
     }
   } else if (kind === 'program') {
     sourceIds.push('academic-calendar-degree-requirements', 'uoft-registrar', 'uoft-current-students');

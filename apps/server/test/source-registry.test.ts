@@ -34,7 +34,6 @@ describe("live source registry", () => {
       "hart-house-events",
       "student-life-events",
       "artsci-academic-dates",
-      "timetable-builder",
       "the-varsity-about",
       "ulife-organizations",
       "quercus-login",

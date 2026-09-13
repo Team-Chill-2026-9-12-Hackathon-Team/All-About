@@ -262,7 +262,6 @@ export const SOURCE_META: Record<string, {label: string; url: string}> = {
   'cs-program-entry-cmp1': {label: 'CS program admission', url: 'https://web.cs.toronto.edu/undergraduate/how-to-apply/cmp1'},
   'uoft-current-students': {label: 'Current Students', url: 'https://www.utoronto.ca/current-students'},
   'uoft-registrar': {label: 'University Registrar', url: 'https://www.registrar.utoronto.ca/'},
-  'timetable-builder': {label: 'Timetable Builder', url: 'https://ttb.utoronto.ca/'},
   'reddit-uoft-csc207': {label: 'Reddit r/UofT RSS', url: 'https://www.reddit.com/r/UofT/.rss'},
   'reddit-uoft': {label: 'Reddit r/UofT RSS', url: 'https://www.reddit.com/r/UofT/.rss'},
   'piazza-login': {label: 'Piazza', url: 'https://piazza.com/login'},
