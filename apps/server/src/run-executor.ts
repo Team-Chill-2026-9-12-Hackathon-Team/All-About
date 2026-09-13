@@ -107,7 +107,7 @@ export class RunExecutor {
           controller.signal,
         );
       } catch (error) {
-        if (controller.signal.aborted) throw error;
+        if (controller.signal.aborted || input.mode === "LIVE_WEB") throw error;
         planningResult = createDefaultPlan(runId, input, sources);
       }
       if ("question" in planningResult) {
