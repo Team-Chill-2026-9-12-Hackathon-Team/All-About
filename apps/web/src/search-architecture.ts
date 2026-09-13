@@ -34,6 +34,7 @@ export function detectSearch(question: string): SearchBlueprint {
   const isCsc207 = /\bcsc\s?-?\s?207\b/i.test(question);
   const isCsc148 = /\bcsc\s?-?\s?148\b/i.test(question);
   const isCarillon = /carillon|labour day|soldiers.? tower/i.test(question);
+  const isAcorn = /\bacorn\b|tuition|invoice|financial account|account balance|my enrol(?:ment|led)|my enroll(?:ment|ed)|my timetable/i.test(question);
   const isComputerScienceProgram = /(?:computer science|\bcs\b|\bcsc\b|\bcmp1\b|计算机科学)/i.test(question);
   const course = isDemo101
     ? 'DEMO101'
@@ -70,6 +71,8 @@ export function detectSearch(question: string): SearchBlueprint {
   } else if (kind === 'program') {
     sourceIds.push('academic-calendar-degree-requirements', 'uoft-registrar', 'uoft-current-students');
     if (isComputerScienceProgram) sourceIds.splice(0, 1, 'academic-calendar-cs-specialist', 'cs-program-entry-cmp1');
+  } else if (isAcorn) {
+    sourceIds.push('acorn-login');
   } else {
     sourceIds.push('uoft-current-students', 'uoft-registrar', 'student-life-events');
   }

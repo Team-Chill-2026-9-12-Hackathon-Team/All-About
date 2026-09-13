@@ -28,10 +28,7 @@ const USERNAME_SELECTOR = [
   'input[name*="email" i]',
 ].map((selector) => `${selector}:visible`).join(", ");
 
-const MFA_TEXT =
-  /two[- ]factor|multi[- ]factor|verification code|authenticator|security code|duo|utormfa|approve the request/i;
-
-const CONTENT_WAIT_MS = 15_000;
+const CONTENT_WAIT_ATTEMPTS = 240;
 
 export async function attemptCredentialLogin(
   page: Page,
@@ -72,8 +69,6 @@ export async function attemptCredentialLogin(
   await page.waitForTimeout(500);
   throwIfAborted(signal);
 
-  if (await pageShowsMfa(page)) return { status: "form_unsupported" };
-
   const contentUrl = await waitForContentHost(page, target, signal);
   if (!contentUrl) return { status: "form_unsupported" };
   return { status: "authenticated", url: contentUrl };
@@ -97,12 +92,10 @@ async function waitForContentHost(
   target: SourceConfig,
   signal: AbortSignal,
 ): Promise<string | null> {
-  const deadline = Date.now() + CONTENT_WAIT_MS;
-  while (Date.now() < deadline) {
+  for (let attempt = 0; attempt < CONTENT_WAIT_ATTEMPTS; attempt += 1) {
     throwIfAborted(signal);
     const captured = contentUrlIfReady(page.url(), target);
     if (captured) return captured;
-    if (await pageShowsMfa(page)) return null;
     await page.waitForTimeout(250);
   }
   return contentUrlIfReady(page.url(), target);
@@ -116,11 +109,6 @@ function contentUrlIfReady(rawUrl: string, target: SourceConfig): string | null 
   } catch {
     return null;
   }
-}
-
-async function pageShowsMfa(page: Page): Promise<boolean> {
-  const body = await page.locator("body").innerText({ timeout: 5_000 }).catch(() => "");
-  return MFA_TEXT.test(body);
 }
 
 function parseHttpsUrl(rawUrl: string): URL | null {

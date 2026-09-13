@@ -329,7 +329,7 @@ export const EventEnvelopeSchema = z.discriminatedUnion("type", [
     type: z.literal("viewer_ready"),
     payload: z.strictObject({
       viewerUrl: z.string().url(),
-      interactive: z.literal(false),
+      interactive: z.boolean(),
     }),
   }),
   z.strictObject({

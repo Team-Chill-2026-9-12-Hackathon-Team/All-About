@@ -82,7 +82,10 @@ export async function collectPages(
     throwIfAborted(combinedSignal);
 
     const viewerUrl = new URL(session.debugUrl);
-    viewerUrl.searchParams.set('interactive', 'false');
+    viewerUrl.searchParams.set(
+      'interactive',
+      plan.targets.some((target) => target.access === 'authorized') ? 'true' : 'false',
+    );
     emit({ type: 'session_ready', viewerUrl: viewerUrl.href });
 
     const cdpUrl = new URL('wss://connect.steel.dev');

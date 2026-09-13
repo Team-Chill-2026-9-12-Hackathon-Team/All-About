@@ -75,6 +75,21 @@ describe("encrypted credential vault", () => {
     });
   });
 
+  it("maps the common ACORN hostname to the configured login host", async () => {
+    const { vault } = await createVault();
+    const created = await vault.create({
+      domain: "acorn.utoronto.ca",
+      username: "studentid",
+      password: "utorid-password",
+    });
+
+    expect(created.domain).toBe("www.acorn.utoronto.ca");
+    await expect(vault.resolve("www.acorn.utoronto.ca")).resolves.toMatchObject({
+      username: "studentid",
+      password: "utorid-password",
+    });
+  });
+
   it("never returns a password from HTTP metadata endpoints", async () => {
     const { vault } = await createVault();
     const app = buildApp({}, { credentialVault: vault });

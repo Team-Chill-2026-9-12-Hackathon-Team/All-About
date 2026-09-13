@@ -221,23 +221,23 @@ export function decodeCredentialVaultKey(encoded: string): Buffer {
 }
 
 export function normalizeCredentialDomain(rawDomain: string): string {
-  const domain = rawDomain.trim().toLowerCase().replace(/\.$/, "");
+  const enteredDomain = rawDomain.trim().toLowerCase().replace(/\.$/, "");
   if (
-    !domain ||
-    domain.includes("/") ||
-    domain.includes(":") ||
-    domain.includes("@") ||
-    domain.includes("?") ||
-    domain.includes("#") ||
-    /\s/.test(domain)
+    !enteredDomain ||
+    enteredDomain.includes("/") ||
+    enteredDomain.includes(":") ||
+    enteredDomain.includes("@") ||
+    enteredDomain.includes("?") ||
+    enteredDomain.includes("#") ||
+    /\s/.test(enteredDomain)
   ) {
     throw new Error("Domain must be a hostname without a protocol, path, or port.");
   }
-  const parsed = new URL(`https://${domain}`);
-  if (parsed.hostname !== domain || !domain.includes(".")) {
+  const parsed = new URL(`https://${enteredDomain}`);
+  if (parsed.hostname !== enteredDomain || !enteredDomain.includes(".")) {
     throw new Error("Domain must be a valid fully qualified hostname.");
   }
-  return domain;
+  return enteredDomain === "acorn.utoronto.ca" ? "www.acorn.utoronto.ca" : enteredDomain;
 }
 
 function requireValue(value: string | undefined, label: string): string {

@@ -68,6 +68,11 @@ describe('question routing', () => {
     const input = buildQueryInput('Where can I find support as a current student?');
     assert.deepEqual(input.sourceIds, ['uoft-current-students', 'uoft-registrar', 'student-life-events']);
   });
+
+  it('routes personal account questions to ACORN', () => {
+    const input = buildQueryInput('What is my ACORN account balance?');
+    assert.deepEqual(input.sourceIds, ['acorn-login']);
+  });
 });
 
 describe('fixed search architecture', () => {
