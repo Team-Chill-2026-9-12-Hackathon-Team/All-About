@@ -44,7 +44,7 @@ const TOPIC_LABEL = {
 
 function followUpsFor(question: string): string[] {
   if (/syllabus|course outline/i.test(question)) {
-    return ['Open the course page', 'Where else could the syllabus be posted?'];
+    return ['Where else could the syllabus be posted?', 'What assessments are listed for this course?'];
   }
   switch (classifyQuestion(question)) {
     case 'course':
@@ -228,6 +228,7 @@ function AnswerView({
   citationsOpen,
   expanded,
   onToggleCitations,
+  courseUrl,
 }: {
   answer: AnswerBundle;
   question: string;
@@ -236,6 +237,7 @@ function AnswerView({
   citationsOpen: boolean;
   expanded: string | null;
   onToggleCitations: (open: boolean) => void;
+  courseUrl?: string;
 }) {
   const facts = compactFacts(answer);
   const pages = [...new Set(answer.sources.map((source) => source.url))];
@@ -268,6 +270,11 @@ function AnswerView({
         {facts[0]?.evidenceIds.slice(0, 1).map((id) => (
           <span key={id} className="inline-source">View original wording <Cite answer={answer} id={id} onCite={onCite} /></span>
         ))}
+        {/syllabus|course outline/i.test(question) && courseUrl && (
+          <a className="answer-open-course" href={courseUrl} target="_blank" rel="noreferrer">
+            <ExternalLink size={15} /> Open the Quercus course page
+          </a>
+        )}
       </section>
       {facts.length > 1 && (
         <section className="answer-section-block" aria-label="What this means">
@@ -826,6 +833,9 @@ function Workspace({onReturnToLanding, onBackToTools}: {onReturnToLanding?: () =
                   citationsOpen={citationsOpen}
                   expanded={expanded}
                   onToggleCitations={setCitationsOpen}
+                  courseUrl={run.activities.slice().reverse().find((item) =>
+                    item.url && (item.title === 'Opening the course syllabus' || item.title === 'Opening your enrolled course')
+                  )?.url}
                 />
                 <EvidenceWorkspace run={run} selectedEvidenceId={expanded} />
               </div>

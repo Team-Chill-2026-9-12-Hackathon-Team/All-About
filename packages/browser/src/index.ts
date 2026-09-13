@@ -561,7 +561,12 @@ async function openMatchingQuercusContent(
     return text.length >= 40 ? {text, title: `${course.course_code ?? ''} ${course.name ?? 'Syllabus'}`.trim()} : null;
   }, canvasCourse.id).catch(() => null as {text: string; title: string} | null);
   if (!syllabus) {
-    throw new BrowserTargetError('NO_MATCH', `${course} is enrolled, but its Quercus syllabus is not published in the Syllabus field.`, false);
+    const linkedSyllabus = await findLinkedCanvasSyllabus(page, canvasCourse.id);
+    if (linkedSyllabus) {
+      await navigateWithinSource(page, linkedSyllabus, target, signal, emit, countStep, 'open_syllabus');
+      return;
+    }
+    throw new BrowserTargetError('NO_MATCH', `${course} is enrolled, but no syllabus was found in Quercus Syllabus, Modules, or Files.`, false);
   }
   countStep();
   emit({type: 'step', sourceId: target.id, action: 'open_syllabus', url: courseUrl.href});
@@ -573,6 +578,25 @@ async function openMatchingQuercusContent(
     content.textContent = text;
     document.body.replaceChildren(heading, content);
   }, syllabus);
+}
+
+async function findLinkedCanvasSyllabus(page: Page, courseId: number): Promise<string | null> {
+  return page.evaluate(async (id) => {
+    const moduleResponse = await fetch(`/api/v1/courses/${id}/modules?include[]=items&per_page=100`);
+    if (moduleResponse.ok) {
+      const modules = await moduleResponse.json() as Array<{items?: Array<{title?: string; html_url?: string; external_url?: string}>}>;
+      const item = modules.flatMap((module) => module.items ?? []).find((candidate) =>
+        /syllabus|course outline/i.test(candidate.title ?? ''),
+      );
+      const itemUrl = item?.html_url ?? item?.external_url;
+      if (itemUrl && new URL(itemUrl, location.origin).hostname === location.hostname) return itemUrl;
+    }
+    const filesResponse = await fetch(`/api/v1/courses/${id}/files?search_term=syllabus&per_page=100`);
+    if (!filesResponse.ok) return null;
+    const files = await filesResponse.json() as Array<{id?: number; display_name?: string; filename?: string}>;
+    const file = files.find((candidate) => /syllabus|course outline/i.test(`${candidate.display_name ?? ''} ${candidate.filename ?? ''}`));
+    return file?.id ? `/courses/${id}/files/${file.id}` : null;
+  }, courseId).catch(() => null);
 }
 
 async function navigateWithinSource(
