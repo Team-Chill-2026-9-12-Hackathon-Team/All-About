@@ -44,7 +44,7 @@ export function detectSearch(question: string): SearchBlueprint {
     : isCsc148
       ? 'CSC148H1'
       : match
-        ? `${match[1].toUpperCase()}${match[2]}${(match[3] ?? '').toUpperCase()}`
+        ? `${match[1].toUpperCase()}${match[2]}${(match[3] ?? 'H1').toUpperCase()}`
         : null;
 
   const sourceIds: string[] = [];

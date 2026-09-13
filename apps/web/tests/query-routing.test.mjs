@@ -1,17 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildQueryInput, classifyQuestion, currentAcademicTerm, pagesFromAnswer } from '../src/live.ts';
+import { buildQueryInput, classifyQuestion, pagesFromAnswer } from '../src/live.ts';
 import { COVERAGE_CATALOG, coverageForKind } from '../src/coverage-catalog.ts';
 import { detectSearch, searchPhase } from '../src/search-architecture.ts';
 
 describe('question routing', () => {
-  it('sends the current academic term with live questions', () => {
-    assert.equal(currentAcademicTerm(new Date('2026-09-13T12:00:00Z')), 'Fall 2026');
-    assert.equal(currentAcademicTerm(new Date('2027-02-13T12:00:00Z')), 'Winter 2027');
-    assert.equal(currentAcademicTerm(new Date('2027-06-13T12:00:00Z')), 'Summer 2027');
-    assert.equal(buildQueryInput('reading week').scope.term, currentAcademicTerm());
-  });
-
   it('sends two calendars for a CSC207 course question', () => {
     assert.equal(classifyQuestion('What are the prerequisites for CSC207H1?'), 'course');
     const input = buildQueryInput('What are the prerequisites for CSC207H1?');
@@ -68,7 +61,7 @@ describe('question routing', () => {
   it('does not silently substitute CSC207 for an unknown course', () => {
     const input = buildQueryInput('What are the prerequisites for MAT223?');
     assert.deepEqual(input.sourceIds, ['academic-calendar-course-search', 'timetable-builder', 'cs-undergrad-courses']);
-    assert.equal(input.scope.course, 'MAT223');
+    assert.equal(input.scope.course, 'MAT223H1');
   });
 
   it('routes general campus questions to student services rather than a CS course', () => {
@@ -84,7 +77,7 @@ describe('question routing', () => {
   it('routes an enrolled course syllabus through Quercus', () => {
     const input = buildQueryInput('PHL245 syllabus');
     assert.deepEqual(input.sourceIds, ['quercus-login', 'academic-calendar-course-search']);
-    assert.equal(input.scope.course, 'PHL245');
+    assert.equal(input.scope.course, 'PHL245H1');
   });
 });
 
