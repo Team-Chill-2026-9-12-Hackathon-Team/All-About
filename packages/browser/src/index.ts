@@ -2,7 +2,7 @@ import Steel from 'steel-sdk';
 import { readCanvasFile } from './canvas-file.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { chromium, type Browser, type Page } from 'playwright';
+import { chromium, type Browser, type CDPSession, type Page } from 'playwright';
 import { BrowserBatchSchema, QueryPlanSchema } from '@allabout/contracts';
 import { fallbackUrlFor, shouldUseFallback } from './fallbacks.js';
 import { attemptCredentialLogin, type CredentialResolver } from './login.js';
@@ -278,6 +278,39 @@ async function collectRedditRss(
   emit({ type: 'page_read', snapshot });
 }
 
+async function capturePreview(page: Page): Promise<string | undefined> {
+  try {
+    const bytes = await page.screenshot({
+      type: 'jpeg',
+      quality: 48,
+      fullPage: false,
+      animations: 'disabled',
+      timeout: 2_500,
+    });
+    return `data:image/jpeg;base64,${bytes.toString('base64')}`;
+  } catch {
+    let session: CDPSession | undefined;
+    try {
+      session = await page.context().newCDPSession(page);
+      const capture = session.send('Page.captureScreenshot', {
+        format: 'jpeg',
+        quality: 48,
+        fromSurface: true,
+        captureBeyondViewport: false,
+      });
+      const result = await Promise.race([
+        capture,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Preview capture timed out.')), 1_500)),
+      ]);
+      return `data:image/jpeg;base64,${result.data}`;
+    } catch {
+      return undefined;
+    } finally {
+      await session?.detach().catch(() => undefined);
+    }
+  }
+}
+
 interface ParsedRedditFeed {
   title: string;
   text: string;
@@ -506,6 +539,7 @@ async function collectTarget(
     .slice(0, 20)
     .map((link) => `Visible link: ${link.text || '(untitled)'} ${link.url}`);
   const text = linkLines.length > 0 ? `${read.text}\n\n${linkLines.join('\n')}` : read.text;
+  const screenshotRef = target.access === 'public' ? await capturePreview(page) : undefined;
 
   const snapshot: PageSnapshot = {
     id: `${plan.runId}:${target.id}:${pages.length + 1}`,
@@ -519,6 +553,7 @@ async function collectTarget(
     scope: { ...target.scope, entity: target.scope.entity ?? read.title },
     kind: target.kind,
     contentMode: target.contentMode,
+    ...(screenshotRef === undefined ? {} : { screenshotRef }),
   };
   pages.push(snapshot);
   emit({ type: 'page_read', snapshot });

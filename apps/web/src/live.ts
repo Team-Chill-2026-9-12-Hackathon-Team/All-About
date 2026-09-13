@@ -124,7 +124,7 @@ export interface LiveRun {
   viewerReason: string | null;
   currentUrl: string | null;
   lastPage: { title: string; url: string; sourceId: string } | null;
-  capturedPages: { title: string; url: string; sourceId: string }[];
+  capturedPages: { title: string; url: string; sourceId: string; screenshotRef?: string }[];
   activities: Activity[];
   answer: AnswerBundle | null;
   error: { code: string; message: string } | null;
@@ -433,6 +433,7 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void, institution: Inst
             title: String(env.payload.title ?? 'page'),
             url,
             sourceId: String(env.payload.sourceId ?? ''),
+            ...(typeof env.payload.screenshotRef === 'string' ? {screenshotRef: env.payload.screenshotRef} : {}),
           };
           next.currentUrl = url;
           next.capturedPages = [...next.capturedPages.filter((page) => page.url !== url), captured];

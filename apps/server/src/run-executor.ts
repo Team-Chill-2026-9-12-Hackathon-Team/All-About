@@ -216,6 +216,7 @@ export class RunExecutor {
           snapshotId: signal.snapshot.id,
           title: signal.snapshot.title,
           url: signal.snapshot.url,
+          ...(signal.snapshot.screenshotRef === undefined ? {} : { screenshotRef: signal.snapshot.screenshotRef }),
         });
         break;
       case "source_failed":

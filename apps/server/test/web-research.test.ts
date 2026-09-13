@@ -1,13 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 import type OpenAI from 'openai';
 import type { QueryPlan, PageSnapshot } from '@allabout/contracts';
-import { createSemanticAnswer, createWebResearchPlanner, publicSearchUrl } from '../src/web-research.js';
+import { createSemanticAnswer, createWebResearchPlanner, focusedPageText, publicSearchUrl } from '../src/web-research.js';
 const scope = {school:'University of Toronto',campus:'UTSG',term:'Fall 2026',course:null,section:null,entity:null};
 const plan: QueryPlan = {runId:'test',input:{query:'reading week',scope,mode:'LIVE_WEB'},targets:[{id:'source',kind:'official',label:'Dates',entryUrl:'https://utoronto.ca/dates',allowedHosts:['utoronto.ca'],scope,contentMode:'live',access:'public'}],requestedFields:['answer'],budget:{maxPages:3,maxSteps:8,timeoutMs:90000}};
 const page: PageSnapshot = {id:'p1',sourceId:'source',url:'https://utoronto.ca/dates',title:'Dates',text:'Fall 2026 reading week: November 2–6, 2026. Prerequisite: MAT135.',fetchedAt:new Date().toISOString(),publishedAt:null,updatedAt:null,scope,kind:'official',contentMode:'live'};
 const candidate = {snapshotId:'p1',text:'Fall 2026 reading week: November 2–6, 2026.',quote:'Fall 2026 reading week: November 2–6, 2026.',directlyAnswersQuestion:true,matchesCourseAndTerm:true,opinion:false};
 function client(claims: unknown[]) {return {responses:{parse:vi.fn().mockResolvedValue({output_parsed:{claims,limitations:[]}})}} as unknown as OpenAI;}
 describe('question-grounded web research', () => {
+ it('keeps relevant text from deep in a long page while reducing synthesis input',()=>{
+  const longText = `Navigation ${'noise '.repeat(6000)}\nFall 2026 reading week: November 2–6, 2026.\n${'footer '.repeat(2000)}`;
+  const focused = focusedPageText('When is Fall 2026 reading week?', longText);
+  expect(focused.length).toBeLessThanOrEqual(24_000);
+  expect(focused).toContain('Fall 2026 reading week: November 2–6, 2026.');
+ });
  it('discovers sources beyond the registry, including forums, without credentials',async()=>{
   const create=vi.fn().mockResolvedValue({output:[{type:'message',content:[{type:'output_text',annotations:[{type:'url_citation',url:'https://www.reddit.com/r/UofT/comments/123',title:'Student discussion'},{type:'url_citation',url:'https://www.utsc.utoronto.ca/registrar/dates',title:'Wrong campus'},{type:'url_citation',url:'http://127.0.0.1/private',title:'Invalid'}]}]}]});
   const result=await createWebResearchPlanner({responses:{create}} as unknown as OpenAI,'test')('test',plan.input,[],new AbortController().signal);

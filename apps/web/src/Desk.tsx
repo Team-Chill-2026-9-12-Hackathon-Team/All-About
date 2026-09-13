@@ -152,10 +152,11 @@ interface SitePane {
   title?: string;
   state: 'live' | 'captured' | 'blocked' | 'waiting';
   detail?: string;
+  screenshotRef?: string;
 }
 
-function sitePanes(run: LiveRun): SitePane[] {
-  const planned = detectSearch(run.question).sourceIds;
+function sitePanes(run: LiveRun, institution: Institution): SitePane[] {
+  const planned = detectSearch(run.question, institution).sourceIds;
   const captured = new Map(run.capturedPages.map((page) => [page.sourceId, page]));
   for (const source of run.answer?.sources ?? []) {
     if (!captured.has(source.sourceId)) {
@@ -175,10 +176,10 @@ function sitePanes(run: LiveRun): SitePane[] {
     const page = captured.get(id);
     const fail = failed.get(id);
     if (id === liveId) {
-      return {id, label: meta?.label ?? id, url: run.currentUrl ?? page?.url ?? meta?.url ?? '', title: page?.title, state: 'live'};
+      return {id, label: meta?.label ?? id, url: run.currentUrl ?? page?.url ?? meta?.url ?? '', title: page?.title, screenshotRef: page?.screenshotRef, state: 'live'};
     }
     if (page) {
-      return {id, label: meta?.label ?? id, url: page.url, title: page.title, state: 'captured'};
+      return {id, label: meta?.label ?? id, url: page.url, title: page.title, screenshotRef: page.screenshotRef, state: 'captured'};
     }
     if (fail) {
       return {id, label: meta?.label ?? id, url: meta?.url ?? '', state: 'blocked', detail: coverageSite(id)?.solution ?? fail.detail};
@@ -634,7 +635,8 @@ function Workspace({institution = 'uoft', onReturnToLanding, onBackToTools}: {in
   const filtered = history.filter((item) => item.question.toLowerCase().includes(search.toLowerCase()));
   const latestUrl = run?.activities.slice().reverse().find((item) => item.url)?.url;
   const blueprint = run ? detectSearch(run.question, institution) : null;
-  const panes = run ? sitePanes(run) : [];
+  const panes = run ? sitePanes(run, institution) : [];
+  const hasSplitPreviews = panes.some((pane) => Boolean(pane.screenshotRef));
   const pipelineSites = blueprint
     ? blueprint.sourceIds.map((id) => SOURCE_META[id]?.label ?? id)
     : [];
@@ -846,7 +848,7 @@ function Workspace({institution = 'uoft', onReturnToLanding, onBackToTools}: {in
             </div>
             <small>{run?.mode ?? 'IDLE'}</small>
           </div>}
-          <div className={`browser-stage ${run && !run.answer ? 'has-live' : ''} ${run && isSteelViewerUrl(run.viewerUrl) && !run.viewerClosed ? 'is-projecting' : run && !run.answer ? 'is-split' : ''} ${run?.answer ? 'has-result' : ''}`}>
+          <div className={`browser-stage ${run && !run.answer ? 'has-live' : ''} ${run && isSteelViewerUrl(run.viewerUrl) && !run.viewerClosed && !hasSplitPreviews ? 'is-projecting' : run && !run.answer ? 'is-split' : ''} ${run?.answer ? 'has-result' : ''}`}>
             {run?.answer ? (
               <div className="result-workspace">
                 <AnswerView
@@ -864,7 +866,7 @@ function Workspace({institution = 'uoft', onReturnToLanding, onBackToTools}: {in
                 <EvidenceWorkspace run={run} selectedEvidenceId={expanded} />
               </div>
             ) : run ? (
-              isSteelViewerUrl(run.viewerUrl) && !run.viewerClosed ? (
+              isSteelViewerUrl(run.viewerUrl) && !run.viewerClosed && !hasSplitPreviews ? (
                 <div className={`live-frame ${isInteractiveSteelViewer(run.viewerUrl) ? 'is-interactive' : ''}`} data-testid="steel-live-frame">
                   {isInteractiveSteelViewer(run.viewerUrl) && (
                     <a className="open-steel-viewer" href={run.viewerUrl ?? undefined} target="_blank" rel="noreferrer">
@@ -909,7 +911,8 @@ function Workspace({institution = 'uoft', onReturnToLanding, onBackToTools}: {in
                         <small>{pane.state}</small>
                       </div>
                       <div className="split-address">{pane.url || 'Waiting'}</div>
-                      <div className="split-body">
+                      <div className={`split-body ${pane.screenshotRef ? 'has-preview' : ''}`}>
+                        {pane.screenshotRef && <img className="split-preview" src={pane.screenshotRef} alt={`${pane.label} captured page`} />}
                         <div className="split-fallback">
                           <b>{pane.title ?? pane.label}</b>
                           <p>

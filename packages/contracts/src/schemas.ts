@@ -349,6 +349,7 @@ export const EventEnvelopeSchema = z.discriminatedUnion("type", [
       snapshotId: identifierSchema,
       title: z.string().trim().min(1),
       url: z.string().url(),
+      screenshotRef: z.string().trim().min(1).optional(),
     }),
   }),
   z.strictObject({
