@@ -77,6 +77,19 @@ export class RuleBasedExtractor implements CandidateExtractor {
       const authorityBasis = registered?.basis ?? (snapshot.kind === "official" ? "Source is registered as official" : null);
       const communitySource = snapshot.kind === "community";
       const titleQuote = snapshot.title.trim();
+      if (requested(plan, "syllabus") && snapshot.sourceId === "quercus-login") {
+        const syllabusQuote = snapshot.text.trim().slice(0, 1200);
+        if (syllabusQuote.length >= 40) {
+          results.push(candidate(
+            snapshot,
+            "syllabus",
+            syllabusQuote,
+            syllabusQuote,
+            authority,
+            authorityBasis,
+          ));
+        }
+      }
       if (requested(plan, "event_name") && titleQuote && snapshot.text.includes(titleQuote)) {
         results.push(candidate(snapshot, "event_name", titleQuote, titleQuote, authority, authorityBasis, { dedupeValue: titleQuote }));
       }

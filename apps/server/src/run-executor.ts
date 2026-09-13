@@ -331,6 +331,9 @@ function defaultRequestedFields(input: QueryInput): QueryPlan["requestedFields"]
   }
   const ids = input.sourceIds ?? [];
   const query = input.query;
+  if (/syllabus|course outline/i.test(query)) {
+    return ["syllabus"];
+  }
   if (
     ids.some((id) => id.startsWith("reddit-")) ||
     /reddit|student discussion|what are students saying/i.test(query)

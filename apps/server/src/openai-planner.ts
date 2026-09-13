@@ -27,6 +27,7 @@ const requestedFieldSchema = z.enum([
   "organizer",
   "registration_link",
   "event_description",
+  "syllabus",
   "other",
 ]);
 
@@ -125,7 +126,10 @@ export function materializePlannerDecision(
   });
 
   const requestedFields = new Set(decision.requestedFields);
-  if (input.mode === "LIVE_WEB" && isCourseQuery(input)) {
+  if (input.mode === "LIVE_WEB" && /syllabus|course outline/i.test(input.query)) {
+    requestedFields.clear();
+    requestedFields.add("syllabus");
+  } else if (input.mode === "LIVE_WEB" && isCourseQuery(input)) {
     requestedFields.add("requirements");
     requestedFields.add("eligibility");
   } else if (input.mode === "LIVE_WEB") {

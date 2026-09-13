@@ -105,6 +105,20 @@ describe("materializePlannerDecision", () => {
     ]);
   });
 
+  it("keeps a syllabus request focused on the syllabus", () => {
+    const syllabusInput = {
+      ...input,
+      query: "STA237 syllabus",
+      scope: { ...input.scope, course: "STA237H1", entity: null },
+    };
+    const plan = materializePlannerDecision("run-syllabus", syllabusInput, [source], {
+      ...planDecision,
+      requestedFields: ["requirements", "eligibility"],
+    });
+    if (!("requestedFields" in plan)) throw new Error("expected a query plan");
+    expect(plan.requestedFields).toEqual(["syllabus"]);
+  });
+
   it("raises the browser step budget when a target needs keychain login", () => {
     const plan = materializePlannerDecision(
       "run-1",

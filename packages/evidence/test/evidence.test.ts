@@ -71,6 +71,19 @@ test("every requested but absent field is reported", async () => {
   assert.deepEqual(result.unknowns, ["The checked sources did not provide eligibility for Demo data · Fictional activity."]);
 });
 
+test("a Quercus syllabus is returned as the answer instead of course requirements", async () => {
+  const courseScope = {...baseScope, course: "STA237H1", entity: null};
+  const text = "STA237H1 — Syllabus Instructor: Ada Lovelace. Assessment: problem sets 30%, midterm 25%, final 45%.";
+  const quercus = {...source("quercus-login", courseScope), kind: "official" as const};
+  const result = await buildAnswer(plan(["syllabus"], [quercus], courseScope), {
+    pages: [page("sta237-syllabus", "quercus-login", text, courseScope)], failures: [], cleanup: "released",
+  }, new AbortController().signal);
+  assert.equal(result.summary[0]?.text, text);
+  assert.equal(result.claims[0]?.field, "syllabus");
+  assert.equal(result.requirements.length, 0);
+  assert.equal(result.unknowns.length, 0);
+});
+
 test("extracts a Calendar prerequisite when its label and value are on separate lines", async () => {
   const courseScope = {...baseScope, course: "CSC207H1", entity: null};
   const text = [

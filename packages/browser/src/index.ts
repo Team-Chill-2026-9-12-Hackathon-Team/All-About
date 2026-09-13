@@ -433,7 +433,9 @@ async function collectTarget(
   }
 
   let authenticated = false;
-  if (target.access === 'authorized' || looksLikeAuthentication(status, currentUrl)) {
+  const visiblePassword = (await page.locator('input[type="password"]:visible').count()) > 0;
+  const isAuthenticationPage = looksLikeAuthentication(status, currentUrl) || visiblePassword;
+  if (isAuthenticationPage) {
     if (resolveCredential === undefined) {
       throw new BrowserTargetError('AUTH_REQUIRED', 'No credential resolver is configured.', false);
     }
@@ -463,6 +465,17 @@ async function collectTarget(
       currentUrl = page.url();
       body = await page.locator('body').innerText({ timeout: 5_000 });
       title = await page.title();
+    }
+  } else if (target.access === 'authorized') {
+    // A persisted Steel profile can land directly on authenticated content.
+    // The absence of a password form here is success, not an unsupported login.
+    authenticated = true;
+    if (target.id === 'quercus-login') {
+      await openMatchingQuercusContent(page, target, plan, signal, emit, countStep);
+      currentUrl = page.url();
+      body = await page.locator('body').innerText({ timeout: 5_000 });
+      title = await page.title();
+      status = null;
     }
   }
 
@@ -538,8 +551,28 @@ async function openMatchingQuercusContent(
   const courseUrl = new URL(`/courses/${canvasCourse.id}`, 'https://q.utoronto.ca/');
   await navigateWithinSource(page, courseUrl.href, target, signal, emit, countStep, 'open_course');
   if (!/syllabus/i.test(plan.input.query)) return;
-  const syllabusUrl = new URL(`/courses/${canvasCourse.id}/assignments/syllabus`, 'https://q.utoronto.ca/');
-  await navigateWithinSource(page, syllabusUrl.href, target, signal, emit, countStep, 'open_syllabus');
+
+  const syllabus = await page.evaluate(async (courseId) => {
+    const response = await fetch(`/api/v1/courses/${courseId}?include[]=syllabus_body`);
+    if (!response.ok) return null;
+    const course = await response.json() as {name?: string; course_code?: string; syllabus_body?: string | null};
+    const documentCopy = new DOMParser().parseFromString(course.syllabus_body ?? '', 'text/html');
+    const text = documentCopy.body.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+    return text.length >= 40 ? {text, title: `${course.course_code ?? ''} ${course.name ?? 'Syllabus'}`.trim()} : null;
+  }, canvasCourse.id).catch(() => null as {text: string; title: string} | null);
+  if (!syllabus) {
+    throw new BrowserTargetError('NO_MATCH', `${course} is enrolled, but its Quercus syllabus is not published in the Syllabus field.`, false);
+  }
+  countStep();
+  emit({type: 'step', sourceId: target.id, action: 'open_syllabus', url: courseUrl.href});
+  await page.evaluate(({title, text}) => {
+    document.title = title;
+    const heading = document.createElement('h1');
+    heading.textContent = `${title} — Syllabus`;
+    const content = document.createElement('main');
+    content.textContent = text;
+    document.body.replaceChildren(heading, content);
+  }, syllabus);
 }
 
 async function navigateWithinSource(
