@@ -429,6 +429,13 @@ async function collectTarget(
     body = await page.locator('body').innerText({ timeout: 5_000 });
     title = await page.title();
     status = null;
+
+    if (target.id === 'quercus-login') {
+      await openMatchingQuercusContent(page, target, plan, signal, emit, countStep);
+      currentUrl = page.url();
+      body = await page.locator('body').innerText({ timeout: 5_000 });
+      title = await page.title();
+    }
   }
 
   const capturedUrl = assertAllowedUrl(currentUrl, target.allowedHosts);
@@ -474,6 +481,57 @@ async function collectTarget(
   } catch {
     // The page is already captured; a cancelled hold must not drop the snapshot.
   }
+}
+
+async function openMatchingQuercusContent(
+  page: Page,
+  target: SourceConfig,
+  plan: QueryPlan,
+  signal: AbortSignal,
+  emit: (signal: BrowserSignal) => void,
+  countStep: () => void,
+): Promise<void> {
+  const course = plan.input.scope.course?.replace(/(?:H1|Y1)$/i, '') ?? '';
+  if (!course) return;
+
+  const courseNeedle = normalizeLinkMatch(course);
+  const courseLinks = await readLinks(page, target.allowedHosts);
+  const courseLink = courseLinks.find((link) =>
+    normalizeLinkMatch(`${link.text} ${link.url}`).includes(courseNeedle),
+  );
+  if (!courseLink) return;
+
+  await navigateWithinSource(page, courseLink.url, target, signal, emit, countStep, 'open_course');
+  if (!/syllabus/i.test(plan.input.query)) return;
+
+  const syllabusLinks = await readLinks(page, target.allowedHosts);
+  const syllabusLink = syllabusLinks.find((link) =>
+    /syllabus/i.test(`${link.text} ${link.url}`),
+  );
+  if (!syllabusLink) return;
+  await navigateWithinSource(page, syllabusLink.url, target, signal, emit, countStep, 'open_syllabus');
+}
+
+async function navigateWithinSource(
+  page: Page,
+  rawUrl: string,
+  target: SourceConfig,
+  signal: AbortSignal,
+  emit: (signal: BrowserSignal) => void,
+  countStep: () => void,
+  action: string,
+): Promise<void> {
+  const url = assertAllowedUrl(rawUrl, target.allowedHosts);
+  throwIfAborted(signal);
+  countStep();
+  emit({type: 'step', sourceId: target.id, action, url: url.href});
+  await page.goto(url.href, {waitUntil: 'domcontentloaded', timeout: 20_000});
+  await page.locator('body').waitFor({timeout: 5_000});
+  throwIfAborted(signal);
+}
+
+function normalizeLinkMatch(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 async function holdForViewer(ms: number, signal: AbortSignal): Promise<void> {

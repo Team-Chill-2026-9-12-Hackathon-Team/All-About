@@ -82,6 +82,7 @@ test("lists UofT SSO hosts only for campus login sources", () => {
     "q.utoronto.ca",
     "idpz.utorauth.utoronto.ca",
     "weblogin.utoronto.ca",
+    "www.acorn.utoronto.ca",
   ]);
 });
 
@@ -155,6 +156,32 @@ test("uses a portal-domain credential after a UofT SSO redirect", async () => {
     status: "authenticated",
     url: "https://q.utoronto.ca/",
   });
+});
+
+test("can reuse a saved ACORN UTORid at the shared UofT sign-in host", async () => {
+  const requested: string[] = [];
+  const result = await attemptCredentialLogin(
+    fakePage({
+      url: "https://idpz.utorauth.utoronto.ca/idp/profile/SAML2/Redirect/SSO",
+      action: "/idp/profile/SAML2/POST/SSO",
+      afterSubmitUrl: "https://q.utoronto.ca/",
+    }),
+    quercus,
+    async (hostname) => {
+      requested.push(hostname);
+      return hostname === "www.acorn.utoronto.ca"
+        ? { username: "studentid", password: "utorid-password" }
+        : null;
+    },
+    new AbortController().signal,
+  );
+  assert.deepEqual(requested, [
+    "idpz.utorauth.utoronto.ca",
+    "q.utoronto.ca",
+    "weblogin.utoronto.ca",
+    "www.acorn.utoronto.ca",
+  ]);
+  assert.deepEqual(result, { status: "authenticated", url: "https://q.utoronto.ca/" });
 });
 
 test("allows a Quercus form to post to the UofT IdP", async () => {

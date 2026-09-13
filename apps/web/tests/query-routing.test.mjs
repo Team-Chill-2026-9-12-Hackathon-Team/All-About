@@ -73,6 +73,12 @@ describe('question routing', () => {
     const input = buildQueryInput('What is my ACORN account balance?');
     assert.deepEqual(input.sourceIds, ['acorn-login']);
   });
+
+  it('routes an enrolled course syllabus through Quercus', () => {
+    const input = buildQueryInput('PHL245 syllabus');
+    assert.deepEqual(input.sourceIds, ['quercus-login', 'academic-calendar-course-search']);
+    assert.equal(input.scope.course, 'PHL245H1');
+  });
 });
 
 describe('fixed search architecture', () => {

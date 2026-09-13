@@ -6,10 +6,16 @@ export const UOFT_SSO_HOSTS = [
   "weblogin.utoronto.ca",
 ] as const;
 
+const UOFT_PORTAL_CREDENTIAL_HOSTS = [
+  ...UOFT_SSO_HOSTS,
+  "q.utoronto.ca",
+  "www.acorn.utoronto.ca",
+] as const;
+
 const EXTRA_LOGIN_HOSTS: Record<string, readonly string[]> = {
   "piazza-login": UOFT_SSO_HOSTS,
-  "quercus-login": UOFT_SSO_HOSTS,
-  "acorn-login": UOFT_SSO_HOSTS,
+  "quercus-login": UOFT_PORTAL_CREDENTIAL_HOSTS,
+  "acorn-login": UOFT_PORTAL_CREDENTIAL_HOSTS,
 };
 
 export function loginHostsFor(target: SourceConfig): string[] {

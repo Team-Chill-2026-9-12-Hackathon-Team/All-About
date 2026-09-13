@@ -85,7 +85,7 @@ export function VaultDrawer({ open, onClose }: { open: boolean; onClose: () => v
         <form className="vault-form" onSubmit={(event) => { event.preventDefault(); void save(); }}>
           <h3>{editing ? "Update account" : "Add a website account"}</h3>
           <label>Website domain<input required placeholder="portal.example.edu" value={draft.domain} onChange={(event) => setDraft((value) => ({...value, domain: event.target.value}))} /></label>
-          <label>Username<input required autoComplete="username" placeholder="you@example.edu" value={draft.username} onChange={(event) => setDraft((value) => ({...value, username: event.target.value}))} /></label>
+          <label>UTORid<input required autoComplete="username" placeholder="Your UTORid" value={draft.username} onChange={(event) => setDraft((value) => ({...value, username: event.target.value}))} /></label>
           <label>{editing ? "New password (leave blank to keep current)" : "Password"}<input required={!editing} autoComplete="new-password" type={showSecret ? "text" : "password"} placeholder={editing ? "Keep current password" : "Password"} value={draft.password} onChange={(event) => setDraft((value) => ({...value, password: event.target.value}))} /></label>
           <div className="vault-actions">
             <button type="button" onClick={() => setShowSecret((value) => !value)}>{showSecret ? "Hide password" : "Show password"}</button>

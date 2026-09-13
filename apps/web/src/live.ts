@@ -387,6 +387,8 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
             fallback_source: 'Opened a public fallback',
             sign_in: 'Signing in with the keychain',
             credential_login: 'Signing in with the keychain',
+            open_course: 'Opening your enrolled course',
+            open_syllabus: 'Opening the course syllabus',
             navigate: next.executionKind === 'local_fixture' ? 'Opening local demo evidence' : 'Opening the browser page',
             read_visible_text: 'Reading visible text',
             hold_for_viewer: 'Holding the live browser so you can see it',

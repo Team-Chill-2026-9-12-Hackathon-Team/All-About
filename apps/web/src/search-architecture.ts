@@ -35,6 +35,7 @@ export function detectSearch(question: string): SearchBlueprint {
   const isCsc148 = /\bcsc\s?-?\s?148\b/i.test(question);
   const isCarillon = /carillon|labour day|soldiers.? tower/i.test(question);
   const isAcorn = /\bacorn\b|tuition|invoice|financial account|account balance|my enrol(?:ment|led)|my enroll(?:ment|ed)|my timetable/i.test(question);
+  const needsQuercus = /syllabus|assignment|course material|lecture|reading|announcement|quercus|my mark|my grade/i.test(question);
   const isComputerScienceProgram = /(?:computer science|\bcs\b|\bcsc\b|\bcmp1\b|计算机科学)/i.test(question);
   const course = isDemo101
     ? 'DEMO101'
@@ -61,7 +62,9 @@ export function detectSearch(question: string): SearchBlueprint {
       sourceIds.push('uoft-events', 'student-life-events', 'hart-house-events');
     }
   } else if (kind === 'course') {
-    if (isCsc207 || course === 'CSC207H1') {
+    if (needsQuercus) {
+      sourceIds.push('quercus-login', 'academic-calendar-course-search');
+    } else if (isCsc207 || course === 'CSC207H1') {
       sourceIds.push('academic-calendar-csc207', 'cs-undergrad-courses', 'timetable-builder');
     } else if (isCsc148 || course === 'CSC148H1') {
       sourceIds.push('academic-calendar-csc148', 'cs-undergrad-courses', 'timetable-builder');
