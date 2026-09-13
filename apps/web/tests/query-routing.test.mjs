@@ -86,6 +86,19 @@ describe('question routing', () => {
     assert.deepEqual(input.sourceIds, ['quercus-login', 'academic-calendar-course-search']);
     assert.equal(input.scope.course, 'PHL245');
   });
+
+  it('routes Waterloo course and community questions to distinct source priorities', () => {
+    assert.deepEqual(detectSearch('What are the prerequisites for CS 246?', 'waterloo').sourceIds,
+      ['waterloo-calendar', 'waterloo-classes', 'uwflow']);
+    assert.deepEqual(detectSearch('What do students say about CS 246 on Reddit?', 'waterloo').sourceIds,
+      ['reddit-waterloo', 'uwflow', 'waterloo-calendar']);
+  });
+
+  it('sends the selected institution and campus to the backend', () => {
+    const input = buildQueryInput('When is reading week?', undefined, 'waterloo');
+    assert.equal(input.scope.school, 'University of Waterloo');
+    assert.equal(input.scope.campus, 'Waterloo');
+  });
 });
 
 describe('fixed search architecture', () => {

@@ -184,6 +184,7 @@ html,body{height:100%;overflow:hidden}
 .forgot{font-size:13px;margin-top:-8px}
 .primary-auth{height:56px;border-radius:5px;font-size:16px;letter-spacing:.01em;box-shadow:0 8px 18px #003e7320}
 .auth-card .remember-session{margin-top:19px;font-size:13px}
+.school-switch{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 24px;padding:5px;border:1px solid #c8d5df;border-radius:10px;background:#edf2f5}.school-switch button{height:40px;border-radius:7px;color:#536b7f;font-size:13px;font-weight:700}.school-switch button.selected{background:#fff;color:#003e73;box-shadow:0 2px 8px #163b5620}.school-switch button.selected.waterloo{background:#f8c928;color:#171717}.app:has(.term:first-child){transition:background .25s ease}
 .auth-foot{font-size:14px!important;margin:28px 0 0!important}
 @keyframes landing-gradient-left{0%,100%{background-position:0% 20%}50%{background-position:100% 80%}}
 @keyframes landing-gradient-right{0%,100%{background-position:0% 0%}50%{background-position:100% 100%}}

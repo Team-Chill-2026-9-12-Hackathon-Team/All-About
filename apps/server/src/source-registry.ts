@@ -2,6 +2,46 @@ import { SourceConfigSchema, type SourceConfig } from "@allabout/contracts";
 
 import { demo101Sources } from "./demo101-fixtures.js";
 
+const waterlooScope = { school: "University of Waterloo", campus: "Waterloo", term: null, course: null, section: null, entity: null };
+const waterlooPublicSourceRows: Array<[string, string, string, string[]]> = [
+  ["waterloo-calendar", "Waterloo Academic Calendar", "https://uwaterloo.ca/academic-calendar/undergraduate-studies/catalog#/home", ["uwaterloo.ca"]],
+  ["waterloo-classes", "Waterloo Classes", "https://classes.uwaterloo.ca/under.html", ["classes.uwaterloo.ca"]],
+  ["waterloo-events", "Waterloo Events", "https://uwaterloo.ca/events", ["uwaterloo.ca"]],
+  ["waterloo-important-dates", "Waterloo Important Dates", "https://uwaterloo.ca/important-dates/undergraduate", ["uwaterloo.ca"]],
+  ["waterloo-registrar", "Waterloo Registrar", "https://uwaterloo.ca/registrar/", ["uwaterloo.ca"]],
+  ["waterloo-programs", "Waterloo Programs", "https://uwaterloo.ca/future-students/programs", ["uwaterloo.ca"]],
+  ["waterloo-policies", "Waterloo Policies", "https://uwaterloo.ca/secretariat/policies-procedures-guidelines", ["uwaterloo.ca"]],
+  ["waterloo-student-life", "Waterloo Current Students", "https://uwaterloo.ca/students/", ["uwaterloo.ca"]],
+  ["waterloo-recreation-events", "Waterloo Recreation", "https://warrior.uwaterloo.ca/", ["warrior.uwaterloo.ca"]],
+  ["waterloo-housing", "Waterloo Campus Housing", "https://uwaterloo.ca/campus-housing/", ["uwaterloo.ca"]],
+  ["waterloo-finance", "Waterloo Student Financial Services", "https://uwaterloo.ca/finance/student-financial-services", ["uwaterloo.ca"]],
+  ["waterloo-coop", "Waterloo Co-op", "https://uwaterloo.ca/co-operative-education/", ["uwaterloo.ca"]],
+  ["waterloo-career", "Waterloo Career Development", "https://uwaterloo.ca/career-development/", ["uwaterloo.ca"]],
+  ["reddit-waterloo", "Reddit r/uwaterloo", "https://www.reddit.com/r/uwaterloo/.rss", ["www.reddit.com"]],
+  ["uwflow", "UW Flow", "https://uwflow.com/", ["uwflow.com"]],
+];
+const waterlooSources: SourceConfig[] = waterlooPublicSourceRows.map(([id, label, entryUrl, allowedHosts]) => ({
+  id,
+  kind: id.startsWith("reddit-") || id === "uwflow" ? "community" : "official",
+  label,
+  entryUrl,
+  allowedHosts,
+  scope: waterlooScope,
+  contentMode: "live",
+  access: "public",
+}));
+
+waterlooSources.push({
+  id: "waterloo-quest",
+  kind: "official",
+  label: "Waterloo Quest",
+  entryUrl: "https://uwaterloo.ca/the-centre/quest",
+  allowedHosts: ["uwaterloo.ca", "quest.pecs.uwaterloo.ca"],
+  scope: waterlooScope,
+  contentMode: "live",
+  access: "authorized",
+});
+
 const candidateSources = [
   {
     id: "academic-calendar-csc207",
@@ -387,6 +427,7 @@ const candidateSources = [
     contentMode: "live",
     access: "authorized",
   },
+  ...waterlooSources,
   ...demo101Sources,
 ] satisfies SourceConfig[];
 

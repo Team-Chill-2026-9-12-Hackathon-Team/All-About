@@ -18,7 +18,7 @@ export function publicSearchUrl(raw: string): URL | null {
 }
 
 export function createWebResearchPlanner(client: OpenAI, model: string): RunPlanner {
-  return async (runId, input, _sources, signal) => {
+  return async (runId, input, sources, signal) => {
     const response = await client.responses.create({
       model, store: false,
       tools: [{ type: 'web_search' }], tool_choice: 'required',
@@ -33,22 +33,33 @@ export function createWebResearchPlanner(client: OpenAI, model: string): RunPlan
         for (const annotation of part.annotations) {
           if (annotation.type !== 'url_citation') continue;
           const url = publicSearchUrl(annotation.url);
-          if (url && sourceMatchesCampus(url, input.scope.campus)) urls.set(url.href, annotation.title || url.hostname);
+          if (url && sourceMatchesInstitution(url, input.scope.school, input.scope.campus)) urls.set(url.href, annotation.title || url.hostname);
         }
       }
     }
-    const targets: SourceConfig[] = [...urls].slice(0, 3).map(([entryUrl, label], index) => {
+    const preferred = (input.sourceIds ?? [])
+      .map((id) => sources.find((source) => source.id === id))
+      .filter((source): source is SourceConfig => source !== undefined);
+    const preferredUrls = new Set(preferred.map((source) => source.entryUrl));
+    const discovered: SourceConfig[] = [...urls]
+      .filter(([entryUrl]) => !preferredUrls.has(entryUrl))
+      .map(([entryUrl, label], index) => {
       const host = new URL(entryUrl).hostname;
       return { id: `search-${index + 1}`, label, entryUrl, allowedHosts: [host],
-        kind: host === 'utoronto.ca' || host.endsWith('.utoronto.ca') ? 'official' : 'community',
+        kind: host === 'utoronto.ca' || host.endsWith('.utoronto.ca') || host === 'uwaterloo.ca' || host.endsWith('.uwaterloo.ca') ? 'official' : 'community',
         scope: input.scope, contentMode: 'live', access: 'public' };
     });
+    const targets = [...preferred.slice(0, 2), ...discovered].slice(0, 3);
     if (!targets.length) throw new Error('Web search returned no readable source URLs. Please retry.');
     return { runId, input, targets, requestedFields: ['answer'], budget: browserPlanBudget(targets) };
   };
 }
 
-function sourceMatchesCampus(url: URL, campus: string | null): boolean {
+function sourceMatchesInstitution(url: URL, school: string | null, campus: string | null): boolean {
+  if (/waterloo/i.test(school ?? '')) {
+    return url.hostname === 'uwaterloo.ca' || url.hostname.endsWith('.uwaterloo.ca') ||
+      url.hostname === 'uwflow.com' || url.hostname === 'www.reddit.com' || url.hostname === 'ratemyprofessors.com' || url.hostname === 'www.ratemyprofessors.com';
+  }
   const normalized = campus?.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
   if (!normalized || !['utsg', 'stgeorge', 'stgeorgeutsg'].includes(normalized)) return true;
   return !/(^|\.)(utsc|utm)\.utoronto\.ca$/i.test(url.hostname);

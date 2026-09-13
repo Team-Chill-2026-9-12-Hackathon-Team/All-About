@@ -10,6 +10,7 @@ describe("live source registry", () => {
       "piazza-login",
       "quercus-login",
       "acorn-login",
+      "waterloo-quest",
     ]);
     expect(live.map(({ id }) => id)).toEqual([
       "academic-calendar-csc207",
@@ -37,6 +38,22 @@ describe("live source registry", () => {
       "ulife-organizations",
       "quercus-login",
       "acorn-login",
+      "waterloo-calendar",
+      "waterloo-classes",
+      "waterloo-events",
+      "waterloo-important-dates",
+      "waterloo-registrar",
+      "waterloo-programs",
+      "waterloo-policies",
+      "waterloo-student-life",
+      "waterloo-recreation-events",
+      "waterloo-housing",
+      "waterloo-finance",
+      "waterloo-coop",
+      "waterloo-career",
+      "reddit-waterloo",
+      "uwflow",
+      "waterloo-quest",
     ]);
     expect(fixtures.map(({ id }) => id)).toEqual([
       "demo101-syllabus",
@@ -56,7 +73,7 @@ describe("live source registry", () => {
       liveSourceRegistry
         .filter((source) => source.access === "authorized")
         .map(({ id }) => id),
-    ).toEqual(["piazza-login", "quercus-login", "acorn-login"]);
+    ).toEqual(["piazza-login", "quercus-login", "acorn-login", "waterloo-quest"]);
     expect(live.every((source) => source.contentMode === "live")).toBe(true);
     expect(fixtures.every((source) => source.contentMode === "fixture")).toBe(true);
   });

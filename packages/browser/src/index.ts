@@ -100,12 +100,14 @@ export async function collectPages(
 
     const context = browser.contexts()[0];
     if (!context) throw new Error('Steel session did not expose its default browser context.');
-    const page = context.pages()[0] ?? (await context.newPage());
+    const firstPage = context.pages()[0] ?? (await context.newPage());
+    const targets = plan.targets.slice(0, plan.budget.maxPages);
+    const workerPages = await Promise.all(targets.map((_, index) => index === 0 ? firstPage : context.newPage()));
 
-    for (const target of plan.targets.slice(0, plan.budget.maxPages)) {
+    await Promise.all(targets.map(async (target, index) => {
       if (combinedSignal.aborted) {
         addFailure(failures, emit, failureForAbort(target.id, signal, timeoutController));
-        continue;
+        return;
       }
 
       if (stepCount + 2 > plan.budget.maxSteps) {
@@ -115,9 +117,16 @@ export async function collectPages(
           message: 'The browser step budget was exhausted before this source could be read.',
           retryable: true,
         });
-        continue;
+        return;
       }
 
+      const page = workerPages[index]!;
+      const countTargetStep = () => {
+        stepCount += 1;
+        if (stepCount > plan.budget.maxSteps) {
+          throw new BrowserTargetError('NO_MATCH', 'The browser step budget was exhausted while reading sources.', true);
+        }
+      };
       let finalFailure: SourceFailure | null = null;
       let activeTarget = target;
       for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -128,15 +137,11 @@ export async function collectPages(
               plan,
               combinedSignal,
               emit,
-              () => {
-                stepCount += 1;
-              },
+              countTargetStep,
               pages,
             );
           } else {
-            await collectTarget(page, activeTarget, plan, combinedSignal, emit, () => {
-              stepCount += 1;
-            }, pages, resolveCredential);
+            await collectTarget(page, activeTarget, plan, combinedSignal, emit, countTargetStep, pages, resolveCredential);
           }
           finalFailure = null;
           break;
@@ -166,12 +171,12 @@ export async function collectPages(
       if (finalFailure) {
         addFailure(failures, emit, finalFailure);
       }
-    }
+    }));
 
     const primary = pickPrimaryPage(plan, pages);
     if (primary && !combinedSignal.aborted) {
       emit({ type: 'step', sourceId: primary.sourceId, action: 'navigate', url: primary.url });
-      await page.goto(primary.url, {
+      await firstPage.goto(primary.url, {
         waitUntil: 'domcontentloaded',
         timeout: Math.min(15_000, remainingMs(plan, timeoutController)),
       }).catch(() => undefined);

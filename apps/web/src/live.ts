@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { detectActivities, detectSearch } from './search-architecture.ts';
+import { detectActivities, detectSearch, type Institution } from './search-architecture.ts';
 
 export { classifyQuestion, detectSearch } from './search-architecture.ts';
 
@@ -198,14 +198,14 @@ export function currentAcademicTerm(now = new Date()): string {
   return `Summer ${year}`;
 }
 
-export function buildQueryInput(question: string, parentRunId?: string) {
-  const plan = detectSearch(question);
+export function buildQueryInput(question: string, parentRunId?: string, institution: Institution = 'uoft') {
+  const plan = detectSearch(question, institution);
   const fixture = plan.sourceIds.some((id) => id.startsWith('demo101-'));
   return {
     query: question.trim().slice(0, 2000),
     scope: {
-      school: 'University of Toronto',
-      campus: 'UTSG',
+      school: institution === 'waterloo' ? 'University of Waterloo' : 'University of Toronto',
+      campus: institution === 'waterloo' ? 'Waterloo' : 'UTSG',
       term: fixture ? 'Fall 2026' : currentAcademicTerm(),
       course: plan.course,
       section: null as string | null,
@@ -279,6 +279,22 @@ export const SOURCE_META: Record<string, {label: string; url: string}> = {
   'artsci-academic-dates': {label: 'A&S academic dates', url: 'https://www.artsci.utoronto.ca/current/dates-deadlines/academic-dates'},
   'artsci-exam-conflicts': {label: 'Exam conflicts', url: 'https://www.artsci.utoronto.ca/current/faculty-registrar/final-exams/exam-conflicts'},
   'ratemyprofessors-uoft': {label: 'Rate My Professors', url: 'https://www.ratemyprofessors.com/'},
+  'waterloo-calendar': {label: 'Waterloo Academic Calendar', url: 'https://uwaterloo.ca/academic-calendar/undergraduate-studies/catalog#/home'},
+  'waterloo-classes': {label: 'Waterloo Classes', url: 'https://classes.uwaterloo.ca/under.html'},
+  'waterloo-events': {label: 'Waterloo Events', url: 'https://uwaterloo.ca/events'},
+  'waterloo-important-dates': {label: 'Waterloo Important Dates', url: 'https://uwaterloo.ca/important-dates/undergraduate'},
+  'waterloo-registrar': {label: 'Waterloo Registrar', url: 'https://uwaterloo.ca/registrar/'},
+  'waterloo-programs': {label: 'Waterloo Programs', url: 'https://uwaterloo.ca/future-students/programs'},
+  'waterloo-policies': {label: 'Waterloo Policies', url: 'https://uwaterloo.ca/secretariat/policies-procedures-guidelines'},
+  'waterloo-student-life': {label: 'Waterloo Current Students', url: 'https://uwaterloo.ca/students/'},
+  'waterloo-recreation-events': {label: 'Waterloo Recreation', url: 'https://warrior.uwaterloo.ca/'},
+  'waterloo-housing': {label: 'Waterloo Campus Housing', url: 'https://uwaterloo.ca/campus-housing/'},
+  'waterloo-finance': {label: 'Waterloo Student Financial Services', url: 'https://uwaterloo.ca/finance/student-financial-services'},
+  'waterloo-coop': {label: 'Waterloo Co-op', url: 'https://uwaterloo.ca/co-operative-education/'},
+  'waterloo-career': {label: 'Waterloo Career Development', url: 'https://uwaterloo.ca/career-development/'},
+  'waterloo-quest': {label: 'Waterloo Quest', url: 'https://uwaterloo.ca/the-centre/quest'},
+  'reddit-waterloo': {label: 'Reddit r/uwaterloo', url: 'https://www.reddit.com/r/uwaterloo/.rss'},
+  'uwflow': {label: 'UW Flow', url: 'https://uwflow.com/'},
 };
 
 const SOURCE_LABEL = Object.fromEntries(
@@ -317,7 +333,7 @@ export interface LiveController {
   reset: () => void;
 }
 
-export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
+export function useLiveRun(onSettled?: (run: LiveRun) => void, institution: Institution = 'uoft'): LiveController {
   const [run, setRun] = useState<LiveRun | null>(null);
   const [executionUnavailable, setExecutionUnavailable] = useState(false);
   const [transportError, setTransportError] = useState<string | null>(null);
@@ -625,8 +641,8 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
 
       const createdAt = Date.now();
       const trimmed = question.trim().slice(0, 2000);
-      const queryInput = buildQueryInput(trimmed, options?.parentRunId);
-      const seed = detectActivities(detectSearch(trimmed), SOURCE_LABEL);
+      const queryInput = buildQueryInput(trimmed, options?.parentRunId, institution);
+      const seed = detectActivities(detectSearch(trimmed, institution), SOURCE_LABEL);
       setRun({
         id: 'detecting',
         question: trimmed,
@@ -702,7 +718,7 @@ export function useLiveRun(onSettled?: (run: LiveRun) => void): LiveController {
         );
       }
     },
-    [closeStream, openStream],
+    [closeStream, institution, openStream],
   );
 
   const cancel = useCallback(async () => {

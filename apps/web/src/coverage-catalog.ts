@@ -271,6 +271,12 @@ const BY_KIND: Record<QueryKind, string[]> = {
     'artsci-exam-conflicts',
     'artsci-academic-dates',
   ],
+  policy: ['uoft-registrar', 'academic-calendar-degree-requirements'],
+  service: ['uoft-current-students', 'uoft-registrar'],
+  housing: ['uoft-current-students', 'student-life-events'],
+  finance: ['uoft-registrar', 'uoft-current-students'],
+  career: ['uoft-current-students', 'reddit-uoft'],
+  community: ['reddit-uoft', 'ratemyprofessors-uoft'],
   general: [
     'uoft-current-students',
     'uoft-registrar',

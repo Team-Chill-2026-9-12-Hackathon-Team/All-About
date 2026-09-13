@@ -11,15 +11,21 @@ import {
   type AnswerBundle, type Evidence, type LiveRun,
 } from './live';
 import { coverageSite } from './coverage-catalog.ts';
-import { SEARCH_PHASES, searchPhase, type SearchPhase } from './search-architecture.ts';
+import { SEARCH_PHASES, searchPhase, type Institution, type SearchPhase } from './search-architecture.ts';
 import { VaultDrawer } from './VaultDrawer';
 import './desk.css';
 
-const starterQuestions = [
+const uoftStarterQuestions = [
   {label: 'Live · CSC207 prerequisites', question: 'What are the prerequisites for CSC207H1?'},
   {label: 'Live · CS Specialist requirements', question: 'What are the graduation requirements for the U of T Computer Science Specialist?'},
   {label: 'Live · Carillon date, place, access', question: 'When and where is the Labour Day Carillon Recital, and is it free?'},
   {label: 'Live · Carillon and Soldiers’ Tower', question: "When is the Labour Day Carillon Recital and what is the Soldiers' Tower carillon?"},
+];
+const waterlooStarterQuestions = [
+  {label: 'Live · CS 246 prerequisites', question: 'What are the prerequisites for CS 246 at Waterloo?'},
+  {label: 'Live · Important dates', question: 'When is Waterloo Fall reading week?'},
+  {label: 'Live · Campus events', question: 'What public events are happening at Waterloo this week?'},
+  {label: 'Community · Course experience', question: 'What do students say about CS 246, and what does the official calendar confirm?'},
 ];
 
 const FIELD_LABEL: Record<string, string> = {
@@ -39,6 +45,12 @@ const TOPIC_LABEL = {
   event: 'Event check',
   exam: 'Exam check',
   program: 'Program check',
+  policy: 'Policy check',
+  service: 'Service check',
+  housing: 'Housing check',
+  finance: 'Financial check',
+  career: 'Career check',
+  community: 'Student experience',
   general: 'Campus check',
 } as const;
 
@@ -412,7 +424,7 @@ function EvidenceWorkspace({run, selectedEvidenceId}: {run: LiveRun; selectedEvi
   );
 }
 
-function Workspace({onReturnToLanding, onBackToTools}: {onReturnToLanding?: () => void; onBackToTools?: () => void} = {}) {
+function Workspace({institution = 'uoft', onReturnToLanding, onBackToTools}: {institution?: Institution; onReturnToLanding?: () => void; onBackToTools?: () => void} = {}) {
   const [input, setInput] = useState('');
   const [history, setHistory] = useState(readHistory);
   const [prefs, setPrefs] = useState(readPreferences);
@@ -445,7 +457,7 @@ function Workspace({onReturnToLanding, onBackToTools}: {onReturnToLanding?: () =
     );
   };
 
-  const live = useLiveRun(persist);
+  const live = useLiveRun(persist, institution);
   const run = live.run;
   const active = !!run && !isTerminal(run.status);
   const connection = connectionLabel(run);
@@ -609,7 +621,7 @@ function Workspace({onReturnToLanding, onBackToTools}: {onReturnToLanding?: () =
   const changePreferences = (change: Partial<Preferences>) => setPrefs((p) => ({...p, ...change}));
   const filtered = history.filter((item) => item.question.toLowerCase().includes(search.toLowerCase()));
   const latestUrl = run?.activities.slice().reverse().find((item) => item.url)?.url;
-  const blueprint = run ? detectSearch(run.question) : null;
+  const blueprint = run ? detectSearch(run.question, institution) : null;
   const panes = run ? sitePanes(run) : [];
   const pipelineSites = blueprint
     ? blueprint.sourceIds.map((id) => SOURCE_META[id]?.label ?? id)
@@ -627,7 +639,7 @@ function Workspace({onReturnToLanding, onBackToTools}: {onReturnToLanding?: () =
           <strong>AllAbout <span>Campus</span></strong>
         </button>
         <div className="header-actions">
-          <span className="term">U of T · Fall 2026</span>
+          <span className="term">{institution === 'waterloo' ? 'Waterloo' : 'U of T'} · Fall 2026</span>
           <button className="mode-chip tools-mode" aria-label="Return to My tools" onClick={() => void returnToTools()}><LayoutGrid size={14} />My tools</button>
           <button
             className={`history-trigger ${vaultOpen ? 'is-active' : ''}`}
@@ -692,7 +704,7 @@ function Workspace({onReturnToLanding, onBackToTools}: {onReturnToLanding?: () =
                 {live.transportError && <p className="transport-error">{live.transportError}</p>}
                 {live.executionUnavailable && <p className="transport-error">The server is up, but live execution is not configured.</p>}
                 <div className="starters">
-                  {starterQuestions.map((item, i) => (
+                  {(institution === 'waterloo' ? waterlooStarterQuestions : uoftStarterQuestions).map((item, i) => (
                     <button className="starter" key={item.question} style={{animationDelay: `${i * 70}ms`}} onClick={() => void start(item.question)}>
                       {item.label}<ArrowUpRight size={15} />
                     </button>
@@ -999,7 +1011,7 @@ const setupCards = [
   },
 ];
 
-function CampusSetup({onContinue, onLogout}: {onContinue: (features: string[]) => void; onLogout: () => void}) {
+function CampusSetup({institution, onContinue, onLogout}: {institution: Institution; onContinue: (features: string[]) => void; onLogout: () => void}) {
   const [selected, setSelected] = useState<string[]>(['Courses & Requirements', 'Campus Events']);
   const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   return (
@@ -1013,7 +1025,7 @@ function CampusSetup({onContinue, onLogout}: {onContinue: (features: string[]) =
       <main className="setup-main">
         <div className="setup-intro">
           <h1>Choose a campus topic</h1>
-          <p>Pick what you want to look up.</p>
+          <p>{institution === 'waterloo' ? 'University of Waterloo research desk.' : 'University of Toronto research desk.'}</p>
         </div>
         <section className="setup-grid">
           {setupCards.map((card, index) => {
@@ -1025,7 +1037,9 @@ function CampusSetup({onContinue, onLogout}: {onContinue: (features: string[]) =
                 <span className="setup-icon"><Icon size={20} /></span>
                 <strong>{card.title}</strong>
                 <p>{card.copy}</p>
-                <span className="setup-sources"><small>SOURCES</small>{card.sources.map((source) => <b key={source}>{source}</b>)}</span>
+                <span className="setup-sources"><small>SOURCES</small>{(institution === 'waterloo'
+                  ? index === 0 ? ['Waterloo Calendar', 'UW Flow'] : index === 1 ? ['Waterloo Events', 'Warrior Rec'] : ['Registrar', 'Waterloo Policies']
+                  : card.sources).map((source) => <b key={source}>{source}</b>)}</span>
                 <span className="select-indicator">{active ? <Check size={15} /> : <Plus size={15} />}</span>
               </button>
             );
@@ -1062,6 +1076,7 @@ type AuthGateProps = {
 };
 
 function AuthGate({forceLogin = false, onEnterDesk, onReturnToLanding}: AuthGateProps = {}) {
+  const [institution, setInstitution] = useState<Institution>('uoft');
   const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [method, setMethod] = useState<'email' | 'phone'>('email');
@@ -1115,8 +1130,8 @@ function AuthGate({forceLogin = false, onEnterDesk, onReturnToLanding}: AuthGate
     setFeatures(null);
     setMode('login');
   };
-  if (authenticated && features) return <Workspace onReturnToLanding={logOut} onBackToTools={() => setFeatures(null)} />;
-  if (authenticated) return <CampusSetup onContinue={(selected) => { setFeatures(selected); onEnterDesk?.(); }} onLogout={logOut} />;
+  if (authenticated && features) return <Workspace institution={institution} onReturnToLanding={logOut} onBackToTools={() => setFeatures(null)} />;
+  if (authenticated) return <CampusSetup institution={institution} onContinue={(selected) => { setFeatures(selected); onEnterDesk?.(); }} onLogout={logOut} />;
   if (entering) {
     return (
       <div className="launch-screen" aria-label="Entering AllAbout Campus">
@@ -1143,6 +1158,10 @@ function AuthGate({forceLogin = false, onEnterDesk, onReturnToLanding}: AuthGate
       <main className="auth-main">
         <div className="auth-top"><span>ALLABOUT CAMPUS</span></div>
         <section className="auth-card">
+          <div className="school-switch" aria-label="Choose university">
+            <button type="button" className={institution === 'uoft' ? 'selected uoft' : ''} onClick={() => setInstitution('uoft')}>U of T</button>
+            <button type="button" className={institution === 'waterloo' ? 'selected waterloo' : ''} onClick={() => setInstitution('waterloo')}>Waterloo</button>
+          </div>
           <h2>{isVerify ? 'Check your inbox' : isForgot ? 'Reset password' : mode === 'create' ? 'Create account' : 'Welcome'}</h2>
           <p>
             {isVerify
@@ -1151,7 +1170,7 @@ function AuthGate({forceLogin = false, onEnterDesk, onReturnToLanding}: AuthGate
                 ? 'We’ll send you a verification code.'
                 : mode === 'create'
                   ? 'Choose email or phone to get started.'
-                  : 'Enter your campus desk.'}
+                  : `Enter your ${institution === 'waterloo' ? 'Waterloo' : 'U of T'} campus desk.`}
           </p>
           {isVerify ? (
             <form onSubmit={verify}>
