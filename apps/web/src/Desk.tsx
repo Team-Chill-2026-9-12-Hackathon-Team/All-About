@@ -3,7 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {
   ArrowRight, ArrowUp, ArrowUpRight, BellRing, BookOpen, CalendarDays, Check, ChevronDown,
   Eye, EyeOff, Globe, History, KeyRound, LoaderCircle, Mail, MessageSquare, Monitor, Smartphone,
-  Plus, RotateCcw, Search, SlidersHorizontal, Square, Trash2, X,
+  LayoutGrid, Plus, RotateCcw, Search, SlidersHorizontal, Square, Trash2, X,
 } from 'lucide-react';
 import {HISTORY_KEY, SETTINGS_KEY, readHistory, readPreferences, type HistoryItem, type Preferences} from './history';
 import {
@@ -94,6 +94,15 @@ function isSteelViewerUrl(url?: string | null): boolean {
   try {
     const host = new URL(url).hostname.toLowerCase();
     return host === 'steel.dev' || host.endsWith('.steel.dev');
+  } catch {
+    return false;
+  }
+}
+
+function isInteractiveSteelViewer(url?: string | null): boolean {
+  if (!url) return false;
+  try {
+    return new URL(url).searchParams.get('interactive') === 'true';
   } catch {
     return false;
   }
@@ -379,7 +388,7 @@ function EvidenceWorkspace({run, selectedEvidenceId}: {run: LiveRun; selectedEvi
   );
 }
 
-function Workspace({onReturnToLanding}: {onReturnToLanding?: () => void} = {}) {
+function Workspace({onReturnToLanding, onBackToTools}: {onReturnToLanding?: () => void; onBackToTools?: () => void} = {}) {
   const [input, setInput] = useState('');
   const [history, setHistory] = useState(readHistory);
   const [prefs, setPrefs] = useState(readPreferences);
@@ -543,6 +552,11 @@ function Workspace({onReturnToLanding}: {onReturnToLanding?: () => void} = {}) {
     onReturnToLanding?.();
   };
 
+  const returnToTools = async () => {
+    await reset();
+    onBackToTools?.();
+  };
+
   const cite = (id: string) => {
     setExpanded(id);
     setCitationsOpen(true);
@@ -590,7 +604,7 @@ function Workspace({onReturnToLanding}: {onReturnToLanding?: () => void} = {}) {
         </button>
         <div className="header-actions">
           <span className="term">U of T · Fall 2026</span>
-          <span className="mode-chip" aria-label="Run mode">{run?.mode ?? 'READY'}</span>
+          <button className="mode-chip tools-mode" aria-label="Return to My tools" onClick={() => void returnToTools()}><LayoutGrid size={14} />My tools</button>
           <button
             className={`history-trigger ${vaultOpen ? 'is-active' : ''}`}
             aria-label="Open password vault"
@@ -800,20 +814,20 @@ function Workspace({onReturnToLanding}: {onReturnToLanding?: () => void} = {}) {
               </div>
             ) : run ? (
               isSteelViewerUrl(run.viewerUrl) && !run.viewerClosed ? (
-                <div className="live-frame" data-testid="steel-live-frame">
+                <div className={`live-frame ${isInteractiveSteelViewer(run.viewerUrl) ? 'is-interactive' : ''}`} data-testid="steel-live-frame">
                   <iframe
                     src={run.viewerUrl ?? undefined}
                     title="Steel live browser"
                     sandbox="allow-scripts allow-same-origin allow-forms"
                     referrerPolicy="no-referrer"
-                    tabIndex={-1}
+                    tabIndex={isInteractiveSteelViewer(run.viewerUrl) ? 0 : -1}
                   />
-                  <div className="gather-overlay">
+                  {!isInteractiveSteelViewer(run.viewerUrl) && <div className="gather-overlay">
                     <span className="gather-kicker">LIVE STEEL SESSION</span>
                     <strong>{panes.find((pane) => pane.state === 'live')?.label ?? 'Opening the live page'}</strong>
                     <small>{latestUrl ?? run.currentUrl ?? 'Connecting the cloud browser to the public page.'}</small>
                     <i className="gather-scan" />
-                  </div>
+                  </div>}
                 </div>
               ) : (
               <div className="split-screen" data-count={Math.max(panes.length, 1)}>
@@ -1069,7 +1083,7 @@ function AuthGate({forceLogin = false, onEnterDesk, onReturnToLanding}: AuthGate
     setFeatures(null);
     setMode('login');
   };
-  if (authenticated && features) return <Workspace onReturnToLanding={onReturnToLanding} />;
+  if (authenticated && features) return <Workspace onReturnToLanding={logOut} onBackToTools={() => setFeatures(null)} />;
   if (authenticated) return <CampusSetup onContinue={(selected) => { setFeatures(selected); onEnterDesk?.(); }} onLogout={logOut} />;
   if (entering) {
     return (
@@ -1156,11 +1170,7 @@ function AuthGate({forceLogin = false, onEnterDesk, onReturnToLanding}: AuthGate
 }
 
 function App() {
-  const [showLanding, setShowLanding] = useState(true);
-  if (showLanding) {
-    return <AuthGate forceLogin onEnterDesk={() => setShowLanding(false)} onReturnToLanding={() => setShowLanding(true)} />;
-  }
-  return <Workspace onReturnToLanding={() => setShowLanding(true)} />;
+  return <AuthGate />;
 }
 
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);
