@@ -1,6 +1,7 @@
 import {
   QueryPlanSchema,
   BrowserBatchSchema,
+  SourceConfigSchema,
   type BrowserBatch,
   type BrowserSignal,
   type BuildAnswer,
@@ -98,18 +99,19 @@ export class RunExecutor {
     try {
       this.#runStore.transition(runId, "planning");
       const input = this.#runStore.getInput(runId);
+      const sources = sourcesForInput(input, this.#sources);
       let planningResult: QueryPlan | ClarificationPlan;
       try {
         planningResult = await this.#withAbort(
-          Promise.resolve(this.#planRun(runId, input, this.#sources, controller.signal)),
+          Promise.resolve(this.#planRun(runId, input, sources, controller.signal)),
           controller.signal,
         );
       } catch (error) {
         if (controller.signal.aborted) throw error;
-        planningResult = createDefaultPlan(runId, input, this.#sources);
+        planningResult = createDefaultPlan(runId, input, sources);
       }
       if ("question" in planningResult) {
-        const allowlisted = createDefaultPlan(runId, input, this.#sources);
+        const allowlisted = createDefaultPlan(runId, input, sources);
         if (allowlisted.targets.length > 0 && (input.sourceIds?.length ?? 0) > 0) {
           planningResult = allowlisted;
         } else {
@@ -288,6 +290,29 @@ export function createDefaultPlan(
     requestedFields: defaultRequestedFields(input),
     budget: browserPlanBudget(targets),
   });
+}
+
+export function sourcesForInput(input: QueryInput, sources: SourceConfig[]): SourceConfig[] {
+  if (input.mode !== "LIVE_WEB") return sources;
+  const course = normalizeCalendarCourse(input.scope.course);
+  if (course === null) return sources;
+
+  return sources.map((source) =>
+    source.id === "academic-calendar-course-search"
+      ? SourceConfigSchema.parse({
+          ...source,
+          label: `A&S Academic Calendar — ${course}`,
+          entryUrl: `https://artsci.calendar.utoronto.ca/course/${course.toLowerCase()}`,
+          scope: {...source.scope, course, entity: null},
+        })
+      : source,
+  );
+}
+
+function normalizeCalendarCourse(course: string | null): string | null {
+  if (course === null) return null;
+  const normalized = course.toUpperCase().replace(/[\s-]/g, "");
+  return /^[A-Z]{3}\d{3}(?:H1|Y1)$/.test(normalized) ? normalized : null;
 }
 
 export function browserPlanBudget(targets: SourceConfig[]): QueryPlan["budget"] {

@@ -2,7 +2,8 @@ import type { CollectPages, QueryInput, SourceConfig } from "@allabout/contracts
 import { describe, expect, it } from "vitest";
 
 import { buildApp } from "../src/app.js";
-import { RunExecutor } from "../src/run-executor.js";
+import { RunExecutor, createDefaultPlan, sourcesForInput } from "../src/run-executor.js";
+import { liveSourceRegistry } from "../src/source-registry.js";
 import { RunStore } from "../src/run-store.js";
 import { createMockBuildAnswer, createMockCollectPages } from "./mock-adapters.js";
 
@@ -49,6 +50,25 @@ async function waitForTerminal(store: RunStore) {
 }
 
 describe("RunExecutor", () => {
+  it("opens the exact official Calendar page for any recognized U of T course code", () => {
+    const courseInput: QueryInput = {
+      ...input,
+      query: "What are the prerequisites for MAT137H1?",
+      scope: {...input.scope, course: "MAT137H1", entity: null},
+      mode: "LIVE_WEB",
+      sourceIds: ["academic-calendar-course-search"],
+    };
+    const sources = sourcesForInput(courseInput, liveSourceRegistry);
+    const plan = createDefaultPlan("run-course", courseInput, sources);
+
+    expect(plan.targets[0]).toMatchObject({
+      id: "academic-calendar-course-search",
+      label: "A&S Academic Calendar — MAT137H1",
+      entryUrl: "https://artsci.calendar.utoronto.ca/course/mat137h1",
+      scope: {course: "MAT137H1"},
+    });
+  });
+
   it("starts through POST /api/runs when explicitly injected", async () => {
     const store = createStore();
     const executor = new RunExecutor({
